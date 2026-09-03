@@ -41,6 +41,14 @@ Initial release.
 - **Example HQ** under `examples/hq-example/` with three fictional domains and filled-in entries.
 - Korean README.
 
+### Fixed
+
+- Pre-release: the PostToolUse tool counter only incremented in `periodic` mode, so `on-stop` —
+  the default — could never tell a session that did nothing from one that did real work and
+  wrote nothing back, and its reminder would never have fired. The counter is now maintained in
+  every non-manual mode. Caught by end-to-end testing against a live session; the cadence tests
+  now assert both directions.
+
 ### Notes
 
 - Requires Node 18 or newer, which Claude Code already requires. No other dependencies.

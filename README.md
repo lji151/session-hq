@@ -52,7 +52,6 @@ Updated `status-apps.md`:
 ```
 
 <!-- TODO: replace with a recording -->
-![demo](docs/demo.gif)
 
 The line that pays for the whole plugin is **Ruled out**. It is the one every session is tempted
 to skip, and the one that stops three sessions independently rediscovering the same dead end.
@@ -215,7 +214,9 @@ If you only ever run one session on one project, you probably do not need this p
 
 - **No multi-account anything.** This is one account with many sessions. There is no feature here
   for working around usage limits, and requests to add one will be declined.
-- **No API proxying**, no model routing, no traffic interception.
+- **No API proxying**, no traffic-level model routing, no request interception. (The
+  `orchestrator-routing` skill is a prompt-level convention for choosing a tier when
+  delegating, not a network layer.)
 - **No dependencies** beyond the Node that Claude Code already requires. No native modules, no
   install step, no daemon.
 - **No automatic writing.** The plugin reminds; it never fabricates a status entry. A status file
