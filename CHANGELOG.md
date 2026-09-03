@@ -66,6 +66,14 @@ Initial release.
 - **`scripts/lib/`.** `hq.mjs` is now a thin CLI over one module per concern, with a one-way
   dependency direction. No behaviour, output, exit code or file format changed.
 
+- **`llms.txt`** at the repo root, and an **At a glance** block in both READMEs: the project's
+  claims with the command or file that checks each one — no dependencies, no network calls, the
+  four environment variables it reads, the files it writes, the test count, the CI matrix.
+- **[docs/security.md](docs/security.md)** — what executes and when, the HQ folder as the trust
+  boundary, secrets and the leak-check gate, and how to report a vulnerability.
+- **A "Compared with" table** in both READMEs, by category rather than product: what each kind
+  of tool stores, who reads it, how long it lives, and what it does not do.
+
 ### Fixed
 
 - Pre-release: the PostToolUse tool counter only incremented in `periodic` mode, so `on-stop` —

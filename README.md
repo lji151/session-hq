@@ -8,6 +8,31 @@ at session start, written at session end.
 
 **Status: 0.1 — early, used daily by the author, APIs may move.**
 
+<details>
+<summary><b>At a glance</b> — every line below is checkable from this repo</summary>
+
+- **No dependencies.** There is no `package.json`; nothing to install. Node ≥ 18, which Claude Code
+  already requires.
+- **No network calls, no telemetry.** `grep -rE "fetch\(|https?://|node:https?|node:net" scripts/`
+  returns nothing.
+- **Reads four environment variables, all its own:** `HQ_ROOT`, `HQ_DOMAIN`, `HQ_MEMORY_DIR`,
+  `CLAUDE_PLUGIN_ROOT`. It reads no credentials and no other configuration.
+  (`grep -roE "env\.[A-Z_]+" scripts/`)
+- **Writes only inside the HQ root:** `hq.config.json`, `status-<domain>.md`, `ideas-inbox.md`,
+  `decisions.md`, `dispatches.md`, `.state/<session-id>.json` — plus the file you name with
+  `dashboard --html`. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
+- **Runs one external process, only when asked:** the command you put after `--` in `wrap`.
+  (`leak-check` also calls `git ls-files`.)
+- **93 tests**, no network and no committed fixtures: `node --test`.
+- **CI:** ubuntu, macos and windows on Node 18 and 22 — `.github/workflows/test.yml`.
+- **Verified locally on Windows 11** with Claude Code 2.1.x, including a live install and hook run;
+  Linux and macOS are covered by the CI matrix rather than by hand.
+- **Three adapters:** Claude Code hooks (automatic), `hq.mjs wrap` (any agent CLI), an instruction
+  file (convention, not enforcement). [docs/adapters.md](docs/adapters.md) says what each guarantees.
+- **MIT licensed.** Security notes and trust boundary: [docs/security.md](docs/security.md).
+
+</details>
+
 [English](README.md) · [한국어](README.ko.md)
 [![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
 
@@ -452,6 +477,24 @@ right now; session-hq is how you find out what it concluded last Tuesday. Auto-m
 how *this repo* works; the HQ remembers what is currently happening across all of them. If you only
 ever run one session on one project, you probably do not need this.
 
+## Compared with
+
+Categories rather than products, because the useful question is what a thing stores and who reads
+it, not whose logo is on it. Several of these are worth running alongside session-hq.
+
+| | What it stores | Who reads it | Lifetime | What it does not do |
+|---|---|---|---|---|
+| **Per-project auto-memory** | durable facts about one repo | the agent, automatically | as long as the project | span projects; track what is in flight |
+| **Session memory / recall tools** | past conversation, retrievable | the agent, on a query | months of transcripts | tell you what is stalled or blocked now |
+| **Observability dashboards** | traces, token counts, latency | you, after the fact | retention window | say what the work concluded |
+| **Live cross-session messaging** | messages between running sessions | the sessions, in the moment | until the session ends | survive a closed session |
+| **session-hq** | current state per domain: status, blockers, what was ruled out, dispatches | every session at start, and you via `dashboard` | until someone edits it | store transcripts, traces, or durable per-repo facts |
+
+The distinction that matters is on the last row: session-hq holds *current state*, deliberately
+compressed and written by hand. It is not an archive, not a trace store, and not a memory index —
+see [Non-goals](#non-goals), and [recipes/conversation-archiver.md](recipes/conversation-archiver.md)
+if you want transcripts kept somewhere.
+
 ## Non-goals
 
 - **No multi-account anything.** This is one account with many sessions. There is no feature here
@@ -483,6 +526,8 @@ adapt them without inheriting anyone's infrastructure:
 - [docs/design.md](docs/design.md) — the problem, the architecture, and the tradeoffs
 - [docs/config.md](docs/config.md) — every configuration key, and the `wrap` reference
 - [docs/case-studies.md](docs/case-studies.md) — three stories about what goes wrong without this
+- [docs/security.md](docs/security.md) — what executes, the trust boundary, reporting
+- [llms.txt](llms.txt) — the same map in one file, for anyone (or anything) summarising the repo
 
 ## How this was built
 

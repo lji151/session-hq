@@ -12,11 +12,14 @@
   "license": "MIT",
   "keywords": [
     "session-management",
-    "memory",
-    "hooks",
-    "orchestration",
-    "multi-session",
+    "cross-session",
     "handoff",
-    "agent-neutral"
+    "status",
+    "orchestrator",
+    "dispatch",
+    "multi-agent",
+    "agent-neutral",
+    "memory",
+    "hooks"
   ]
 }

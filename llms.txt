@@ -1,0 +1,71 @@
+# session-hq
+
+A shared, file-based headquarters for AI coding-agent sessions. One markdown status file per
+domain, read at session start and written at session end, plus an ideas inbox, a decision log,
+and a dispatch queue. The protocol is plain markdown; `scripts/hq.mjs` is a dependency-free Node
+CLI; the Claude Code plugin is one adapter over it. Version 0.1.0, MIT.
+
+## Who it is for
+
+- [Problem statement](README.md): someone running several agent sessions who cannot see, across
+  all of them, what is stalled, blocked, or untouched.
+- [Why one session is not enough](docs/design.md): mixing and compaction push you to split by
+  domain; splitting then costs you visibility, which is the problem this addresses.
+- Not for a single session on a single project. The README says so.
+
+## The three adapters
+
+- [Claude Code hooks](hooks/hooks.json): the only fully automatic one. SessionStart and PreCompact
+  inject, PostToolUse counts, Stop checks. Only this one can block a session from ending.
+- [`hq.mjs wrap`](docs/adapters.md): prints the same context, runs any agent command with the
+  terminal attached, propagates its exit code, checks on exit. No hooks required.
+- [Instruction file](docs/adapters.md): three lines pasted into AGENTS.md, GEMINI.md, .cursorrules
+  or a system prompt. Convention, not enforcement — the docs label it as such.
+
+## Commands
+
+- `init`, `inject`, `remind`, `update-check`, `wrap` — set up and run a session
+- `dispatch`, `done`, `ack`, `dispatches` — hand work to a domain and review the result
+- `dashboard` — every domain on one screen; `--md` and `--html <file>`
+- `inbox`, `decide`, `doctor`, `memory-lint`, `leak-check`
+- Slash-command equivalents live in [commands/](commands/), one file each.
+
+## Guarantees, and how to check them
+
+- **No dependencies.** There is no `package.json` in the repo; nothing to install.
+- **No network calls.** `grep -rE "fetch\(|https?://|node:https?|node:net" scripts/` returns
+  nothing.
+- **No telemetry.** Same grep; nothing is sent anywhere.
+- **Reads four environment variables**, all its own: `HQ_ROOT`, `HQ_DOMAIN`, `HQ_MEMORY_DIR`,
+  `CLAUDE_PLUGIN_ROOT`. Check with `grep -roE "env\.[A-Z_]+" scripts/`.
+- **Writes only inside the HQ root** — `status-<domain>.md`, `ideas-inbox.md`, `decisions.md`,
+  `dispatches.md`, `hq.config.json`, `.state/<session-id>.json` — plus the path you pass to
+  `dashboard --html`. Check with `grep -rn "writeFileSync\|mkdirSync" scripts/`.
+- **Runs one external process, and only on request:** the command after `--` in `wrap`
+  ([scripts/lib/wrap.mjs](scripts/lib/wrap.mjs)); `leak-check` also shells out to `git ls-files`.
+- **93 tests**, no network and no committed fixtures: `node --test`.
+- [Security notes](docs/security.md): threat model, trust boundary, reporting.
+
+## Non-goals, stated in the README
+
+- No multi-account or usage-limit features. One account, many sessions.
+- No API proxying, traffic-level model routing, or request interception.
+- No automatic writing of status content — the tools remind, they never fabricate an entry.
+- No claims about other tools' internals.
+
+## Where to start reading
+
+- [README.md](README.md) — problem, quick start for both adapter paths, configuration
+- [docs/design.md](docs/design.md) — the argument, the tradeoffs, and what is deliberately absent
+- [docs/adapters.md](docs/adapters.md) — what each adapter guarantees, and how to write one
+- [docs/config.md](docs/config.md) — every configuration key, profiles, `wrap` and `dashboard`
+- [docs/case-studies.md](docs/case-studies.md) — three fictionalised failure modes
+- [skills/hq-protocol/SKILL.md](skills/hq-protocol/SKILL.md) — what a good status entry contains
+
+## How to verify the repo
+
+- `node --test` — 93 tests
+- `claude plugin validate . --strict` and `claude plugin validate .claude-plugin/plugin.json --strict`
+- `node scripts/leak-check.mjs --denylist .github/leak-denylist.example.txt` — credential-shaped
+  pattern scan over tracked files
+- `.github/workflows/test.yml` — CI matrix: ubuntu, macos, windows on Node 18 and 22

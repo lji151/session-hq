@@ -8,6 +8,31 @@ Gemini CLI, Cursor, aider, 혹은 셸에서 돌리는 로컬 모델까지 — �
 
 **상태: 0.1 — 초기 단계. 만든 사람이 매일 쓰고 있으며, API는 바뀔 수 있다.**
 
+<details>
+<summary><b>한눈에</b> — 아래 항목은 전부 이 저장소에서 직접 확인할 수 있다</summary>
+
+- **의존성 없음.** `package.json` 자체가 없다. 설치할 것도 없고, Claude Code가 이미 요구하는
+  Node 18 이상이면 된다.
+- **네트워크 호출 없음, 텔레메트리 없음.**
+  `grep -rE "fetch\(|https?://|node:https?|node:net" scripts/` 결과가 비어 있다.
+- **읽는 환경 변수는 자기 것 네 개뿐:** `HQ_ROOT`, `HQ_DOMAIN`, `HQ_MEMORY_DIR`,
+  `CLAUDE_PLUGIN_ROOT`. 자격 증명이나 다른 설정은 읽지 않는다.
+  (`grep -roE "env\.[A-Z_]+" scripts/`)
+- **쓰기는 HQ 루트 안에서만:** `hq.config.json`, `status-<domain>.md`, `ideas-inbox.md`,
+  `decisions.md`, `dispatches.md`, `.state/<session-id>.json`. 그 밖에는 `dashboard --html`에
+  직접 지정한 파일뿐이다. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
+- **외부 프로세스는 요청할 때 하나만 실행한다:** `wrap`의 `--` 뒤에 쓴 명령.
+  (`leak-check`은 `git ls-files`도 부른다.)
+- **테스트 93개.** 네트워크도, 저장소에 넣어 둔 픽스처도 없다: `node --test`.
+- **CI:** ubuntu·macos·windows × Node 18·22 — `.github/workflows/test.yml`.
+- **Windows 11에서 직접 검증**했다(Claude Code 2.1.x, 실제 설치와 훅 실행 포함). Linux와 macOS는
+  손으로가 아니라 CI 매트릭스로 커버한다.
+- **어댑터 세 가지:** Claude Code 훅(자동), `hq.mjs wrap`(모든 에이전트 CLI), 지시 파일(강제가
+  아니라 관행). 각각 무엇을 보장하는지는 [docs/adapters.md](docs/adapters.md)에 있다.
+- **MIT 라이선스.** 보안 메모와 신뢰 경계는 [docs/security.md](docs/security.md).
+
+</details>
+
 [English](README.md) · [한국어](README.ko.md)
 [![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
 
@@ -435,6 +460,24 @@ HQ를 어떻게 볼지도 전부 취향껏 돌릴 수 있는 다이얼이다. �
 HQ는 저장소 전체를 통틀어 지금 무슨 일이 벌어지는지를 기억한다. 프로젝트 하나에 세션 하나만 돌린다면
 아마 필요 없다.
 
+## 다른 방식과 비교하면
+
+제품 이름이 아니라 범주로 적는다. 중요한 질문은 무엇을 저장하고 누가 읽느냐이지, 어느 회사 것이냐가
+아니기 때문이다. 아래 중 몇 가지는 session-hq와 같이 쓰면 좋다.
+
+| | 무엇을 저장하나 | 누가 읽나 | 수명 | 하지 않는 것 |
+|---|---|---|---|---|
+| **프로젝트별 자동 메모리** | 저장소 하나에 대한 지속적 사실 | 에이전트가 자동으로 | 프로젝트가 살아 있는 동안 | 프로젝트를 가로지르기, 진행 중인 일 추적 |
+| **세션 메모리·회상 도구** | 지난 대화, 검색 가능한 형태 | 에이전트가 질의할 때 | 몇 달 치 기록 | 지금 무엇이 멈췄고 막혔는지 알려 주기 |
+| **관측(옵저버빌리티) 대시보드** | 트레이스, 토큰 수, 지연 시간 | 사람이 사후에 | 보존 기간까지 | 그 작업이 무슨 결론을 냈는지 말해 주기 |
+| **실시간 세션 간 메시징** | 돌고 있는 세션들 사이의 메시지 | 세션들이 그 순간에 | 세션이 끝날 때까지 | 닫힌 세션 너머까지 남기 |
+| **session-hq** | 도메인별 현재 상태: 진행·대기·배제됨·dispatch | 모든 세션이 시작 시, 사람은 `dashboard`로 | 누군가 고칠 때까지 | 대화 기록·트레이스·저장소별 지속 사실 보관 |
+
+가장 중요한 건 마지막 줄이다. session-hq가 담는 것은 *현재 상태*이고, 일부러 압축해서 사람이 손으로
+적는다. 아카이브도, 트레이스 저장소도, 메모리 인덱스도 아니다 — [하지 않는 것](#하지-않는-것)을 보고,
+대화 기록을 남기고 싶다면 [recipes/conversation-archiver.md](recipes/conversation-archiver.md)를
+참고할 것.
+
 ## 하지 않는 것
 
 - **다중 계정 관련 기능은 없다.** 이것은 계정 하나에 세션 여럿인 상황을 위한 것이다. 사용량 제한을
@@ -465,6 +508,8 @@ HQ와 잘 어울리는 패턴들이다. 남의 인프라를 통째로 물려받�
 - [docs/design.md](docs/design.md) — 문제 정의, 아키텍처, 설계상의 트레이드오프
 - [docs/config.md](docs/config.md) — 모든 설정 키와 `wrap` 레퍼런스
 - [docs/case-studies.md](docs/case-studies.md) — 이것이 없을 때 무엇이 잘못되는지에 대한 사례 세 편
+- [docs/security.md](docs/security.md) — 무엇이 실행되는지, 신뢰 경계, 제보 방법
+- [llms.txt](llms.txt) — 같은 지도를 한 파일로. 저장소를 요약하려는 사람(또는 도구)을 위한 것
 
 ## 어떻게 만들었나
 
