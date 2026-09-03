@@ -60,6 +60,12 @@ Initial release.
 - **Example HQ** under `examples/hq-example/` with three fictional domains and filled-in entries.
 - Korean README.
 
+- **An animated `docs/demo.svg`** in both READMEs: the 60-second transcript played line by line
+  over 25 seconds and looping. Self-contained SMIL, no scripts, no external fonts, no network
+  requests; the fenced transcript stays below it for text readers.
+- **`scripts/lib/`.** `hq.mjs` is now a thin CLI over one module per concern, with a one-way
+  dependency direction. No behaviour, output, exit code or file format changed.
+
 ### Fixed
 
 - Pre-release: the PostToolUse tool counter only incremented in `periodic` mode, so `on-stop` —

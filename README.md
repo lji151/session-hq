@@ -42,6 +42,10 @@ every department's meetings. You want the report. `hq.mjs dashboard` is that rep
 Shown with Claude Code, where the hooks make it automatic. Every other agent runs the same
 protocol through [`wrap`](docs/adapters.md) or its own instruction file.
 
+![session-hq demo: the status file is injected at session start, and the session is reminded to write back before it stops](docs/demo.svg)
+
+<sub>The same run as text, below.</sub>
+
 ```console
 $ claude
 ──────────────────────────────────────────────────────────────────────────────
@@ -80,8 +84,6 @@ Updated `status-apps.md`:
   - Status: fixed. record() now carries the original error; fixture green.
   - Ruled out: retry backoff was never involved — timings identical before/after.
 ```
-
-<!-- TODO: replace with a recording -->
 
 The line that pays for the whole thing is **Ruled out**. It is the one every session is tempted to
 skip, and the one that stops three sessions independently rediscovering the same dead end.
