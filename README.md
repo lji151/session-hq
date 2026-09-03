@@ -204,6 +204,44 @@ Three moments, however they are triggered:
 goes in comes from a session that actually did the work. A generated entry is a plausible-sounding
 entry, which is exactly what makes a file stop being trusted.
 
+### See everything at once
+
+Five domains is past the point where you can hold the picture in your head. `dashboard` collapses
+every status file into one screen, and answers the question you actually have — *what have I
+missed* — rather than just listing what exists.
+
+```console
+$ node scripts/hq.mjs dashboard
+
+session-hq dashboard — ~/hq
+3 domains · stale after 48h · generated 2026-02-04 09:12 UTC
+
+DOMAIN    LAST UPDATED       WORK  BLOCKED  NEXT
+--------  -----------------  ----  -------  ----
+video     6d ago    ⚠ STALE     3        1     3
+apps      3h ago                4        1     4
+business  just now              0        0     0
+
+STALE (> 48h)
+  video        6d ago
+
+BLOCKED
+  video · Platform A collapse — support ticket response, opened five days ago
+  apps · Shoreline store submission — platform review, outside our control
+
+UNTOUCHED
+  business (no workstreams yet)
+
+INBOX  6 ideas waiting
+LATEST DECISIONS
+  2026-01-28 | export ships without streaming; revisit above 20 MB | apps
+  2026-01-30 | a 50-unit sample before any volume order | business
+  2026-01-31 | cold opens replace framing intros | video
+```
+
+`--md` gives the same picture as markdown. `--html <file>` writes a self-contained page — inline
+CSS, no scripts, no network — to keep open on a second monitor. Under Claude Code, `/hq-dashboard`.
+
 ## Configure the cadence
 
 Nagging that does not fit how you work gets turned off, and then the whole thing rots. So the

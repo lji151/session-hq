@@ -26,8 +26,12 @@ Initial release.
 - **Configurable write-back cadence** — `update.mode` of `on-stop`, `periodic`, or `manual`;
   `everyNTools` and `minMinutesBetween` for periodic nudging; `update.enforce` to turn the
   on-stop reminder into a blocking Stop decision. Soft reminder is the default.
+- **`hq.mjs dashboard`** — every domain on one screen: a table of last-updated, workstream,
+  blocker and next-action counts, then the three lists that answer "what have I missed" (stale,
+  blocked, untouched), the inbox count and the last decisions. `--md`, and `--html <file>` for a
+  self-contained page with no scripts or network references.
 - **Slash commands**: `/hq-init`, `/hq-status`, `/hq-update`, `/hq-inbox`, `/hq-decide`,
-  `/hq-doctor`, `/memory-lint`.
+  `/hq-doctor`, `/hq-dashboard`, `/memory-lint`.
 - **Skills**: `hq-protocol` (when to read and write, what a real status entry contains, why
   negative results are mandatory), `layered-memory` (index to domain index to one fact per file,
   with the frontmatter schema and the Why / How-to-apply format), `orchestrator-routing`

@@ -201,6 +201,43 @@ flowchart LR
 그 작업을 한 세션에서 나온다. 자동 생성된 항목은 그럴듯하게 들리는 항목일 뿐이고, 그런 항목 하나면
 파일 전체가 신뢰를 잃는다.
 
+### 한 화면에서 전부 보기
+
+도메인이 다섯 개쯤 되면 머릿속에 그림을 담아 둘 수 없다. `dashboard`는 모든 상태 파일을 한 화면으로
+접어서, 무엇이 있는지 나열하는 대신 실제로 궁금한 것 — *내가 무엇을 놓쳤는가* — 에 답한다.
+
+```console
+$ node scripts/hq.mjs dashboard
+
+session-hq dashboard — ~/hq
+3 domains · stale after 48h · generated 2026-02-04 09:12 UTC
+
+DOMAIN    LAST UPDATED       WORK  BLOCKED  NEXT
+--------  -----------------  ----  -------  ----
+video     6d ago    ⚠ STALE     3        1     3
+apps      3h ago                4        1     4
+business  just now              0        0     0
+
+STALE (> 48h)
+  video        6d ago
+
+BLOCKED
+  video · Platform A collapse — support ticket response, opened five days ago
+  apps · Shoreline store submission — platform review, outside our control
+
+UNTOUCHED
+  business (no workstreams yet)
+
+INBOX  6 ideas waiting
+LATEST DECISIONS
+  2026-01-28 | export ships without streaming; revisit above 20 MB | apps
+  2026-01-30 | a 50-unit sample before any volume order | business
+  2026-01-31 | cold opens replace framing intros | video
+```
+
+`--md`는 같은 내용을 마크다운으로 낸다. `--html <파일>`은 인라인 CSS만 쓰고 스크립트도 네트워크도
+없는 자체 완결 페이지를 만들어, 보조 모니터에 띄워 두기 좋다. Claude Code에서는 `/hq-dashboard`.
+
 ## 주기 설정
 
 작업 방식에 맞지 않는 잔소리는 결국 꺼지고, 그러면 체계 전체가 썩는다. 그래서 주기는 일급 설정으로 둔다.

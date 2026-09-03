@@ -188,6 +188,38 @@ Language hint for generated templates and prose. It does not change the CLI's ow
 
 ---
 
+## The dashboard
+
+```bash
+node scripts/hq.mjs dashboard [--stale-hours N] [--md | --html <file>]
+```
+
+One screen for every domain. It exists to answer *what have I missed*, so the three lists under the
+table matter more than the table:
+
+- **Stale**, oldest first — unverified, not necessarily wrong.
+- **Blocked** — domain, workstream, and what it is waiting on.
+- **Untouched** — domains with no workstreams, or only the placeholder block `init` writes. A domain
+  in this list is either finished or forgotten, and the difference is worth knowing.
+
+Then the inbox count and the last three decisions.
+
+| Option | Effect |
+|---|---|
+| `--stale-hours N` | Override `inject.staleAfterHours` for this one look. |
+| `--md` | The same picture as markdown, for pasting into a note or an issue. |
+| `--html <file>` | Write a self-contained page — inline CSS, no scripts, no network — to keep open on a second monitor. Static: regenerate to refresh. |
+
+Counting rules, so the numbers are not mysterious:
+
+- **Workstreams** are `###` blocks. Prose under a `##` heading is not counted.
+- **Blocked** counts blocks whose `Blocked on` is present and is not `nothing`, `none`, `n/a`, `-`,
+  or `tbd`.
+- **Next** counts blocks with a real `Next` line by the same rule.
+- A domain is **untouched** when every block is the placeholder from `init`.
+
+Under Claude Code the same thing is `/hq-dashboard`.
+
 ## Running an agent inside an HQ session (`wrap`)
 
 `wrap` is the adapter for agents that have no hook system. It prints the context the Claude Code
