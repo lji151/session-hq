@@ -76,6 +76,10 @@ local denylist, at minimum grep your diff for your own username and home directo
 
 ## Code
 
+- **`scripts/hq.mjs` is a thin CLI**: argument parsing and a dispatch table. The work lives in
+  `scripts/lib/` — one module per concern (`config`, `status`, `dispatch`, `dashboard`, `inject`,
+  `hooks`, `wrap`, `init`, `notes`, `doctor`, `memory`, `args`, `util`). Keep modules small and
+  the dependency direction one-way: `util` depends on nothing, and nothing depends on `hq.mjs`.
 - **Node built-ins only.** No dependencies, no native modules, no build step. If something seems
   to need a library, it probably needs less code instead.
 - **ESM**, `.mjs`, and every path handled through `node:path`. Windows is a first-class target —
