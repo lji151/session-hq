@@ -15,7 +15,7 @@ let ROOT;
 
 function hq(args, env = {}) {
   const res = spawnSync(process.execPath, [CLI, ...args], {
-    input: '', encoding: 'utf8', cwd: ROOT,
+    input: '', encoding: 'utf8', cwd: ROOT, timeout: 15000,
     env: { ...process.env, HQ_ROOT: ROOT, HQ_DOMAIN: '', ...env },
   });
   if (res.error) throw res.error;
@@ -125,7 +125,7 @@ describe('domain summary', () => {
 
 describe('dashboard output', () => {
   test('terminal mode shows the table and all three lists', () => {
-    const { stdout, code } = hq(['dashboard']);
+    const { stdout, code } = hq(['dashboard', '--terminal']);
     assert.equal(code, 0);
     assert.match(stdout, /session-hq dashboard/);
     assert.match(stdout, /DOMAIN\s+LAST UPDATED\s+WORK\s+BLOCKED\s+NEXT/);
@@ -145,11 +145,11 @@ describe('dashboard output', () => {
   });
 
   test('--stale-hours overrides the configured threshold', () => {
-    const wide = hq(['dashboard', '--stale-hours', '9000']);
+    const wide = hq(['dashboard', '--terminal', '--stale-hours', '9000']);
     assert.ok(!/⚠ STALE/.test(wide.stdout));
     assert.match(wide.stdout, /STALE \(> 9000h\)\s*\n\s*none/);
 
-    const narrow = hq(['dashboard', '--stale-hours', '1']);
+    const narrow = hq(['dashboard', '--terminal', '--stale-hours', '1']);
     assert.match(narrow.stdout, /apps\s+\d+h ago\s+⚠ STALE/);
   });
 
@@ -181,5 +181,58 @@ describe('dashboard output', () => {
     const { code, stderr } = hq(['dashboard', '--stale-hours', 'soon']);
     assert.equal(code, 1);
     assert.match(stderr, /must be a non-negative number/);
+  });
+});
+
+describe('the page, opened for you (default view)', () => {
+  test('with no flags, writes <hqRoot>/dashboard.html and prints exactly one line', () => {
+    const { stdout, code } = hq(['dashboard', '--no-open']);
+    assert.equal(code, 0);
+    const out = path.join(ROOT, 'dashboard.html');
+    assert.ok(fs.existsSync(out), 'dashboard.html must be written at the HQ root');
+    assert.equal(stdout.trim().split('\n').length, 1, 'exactly one line of output');
+    assert.match(stdout, /dashboard\.html/, 'the line names the file');
+    assert.match(stdout, /`hq dashboard`/, 'the line says how to refresh it');
+  });
+
+  test('the page leads with the what-did-I-miss lists, then the table, then inbox/decisions', () => {
+    const { code } = hq(['dashboard', '--no-open']);
+    assert.equal(code, 0);
+    const html = fs.readFileSync(path.join(ROOT, 'dashboard.html'), 'utf8');
+    const at = (re) => { const m = html.search(re); assert.ok(m !== -1, `${re} not found`); return m; };
+    const staleAt = at(/<h2>Stale/);
+    const blockedAt = at(/<h2>Blocked/);
+    const awaitingAt = at(/<h2>Awaiting review/);
+    const untouchedAt = at(/<h2>Untouched/);
+    const tableAt = at(/<table/);
+    const inboxAt = at(/<h2>Inbox and decisions/);
+    assert.ok(staleAt < blockedAt && blockedAt < awaitingAt && awaitingAt < untouchedAt,
+      'the four lists must lead, in order: stale, blocked, awaiting review, untouched');
+    assert.ok(untouchedAt < tableAt, 'the domain table follows the lists');
+    assert.ok(tableAt < inboxAt, 'inbox and decisions come last');
+  });
+
+  test('without --watch, the page names the manual refresh path', () => {
+    const { code } = hq(['dashboard', '--no-open']);
+    assert.equal(code, 0);
+    const html = fs.readFileSync(path.join(ROOT, 'dashboard.html'), 'utf8');
+    assert.ok(!/http-equiv="refresh"/.test(html), 'no auto-refresh without --watch');
+    assert.match(html, /run <code>hq dashboard<\/code> again, or <code>--watch<\/code>, to refresh/);
+  });
+
+  test('--watch regenerates the file until --watch-iterations is reached, then the process exits', () => {
+    const out = path.join(ROOT, 'dashboard.html');
+    fs.writeFileSync(out, 'stale placeholder', 'utf8');
+    const old = new Date(Date.now() - 60000);
+    fs.utimesSync(out, old, old);
+
+    const { code, stdout } = hq(['dashboard', '--watch', '1', '--watch-iterations', '2', '--no-open']);
+    assert.equal(code, 0, 'the process must exit cleanly once iterations are exhausted');
+    assert.match(stdout, /refreshing every 1s/);
+
+    const stat = fs.statSync(out);
+    assert.ok(stat.mtimeMs > old.getTime(), 'the file must have been rewritten');
+    const html = fs.readFileSync(out, 'utf8');
+    assert.match(html, /<meta http-equiv="refresh" content="1">/);
   });
 });

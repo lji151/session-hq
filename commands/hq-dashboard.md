@@ -1,6 +1,6 @@
 ---
-description: Show every HQ domain on one screen — stale, blocked, and untouched work
-argument-hint: "[--stale-hours N] [--md] [--html <file>]"
+description: Open the HQ dashboard — one page with what you missed, refreshed on demand
+argument-hint: "[--watch] [--stale-hours N]"
 allowed-tools: ["Bash", "Read"]
 ---
 
@@ -10,19 +10,24 @@ allowed-tools: ["Bash", "Read"]
 node "${CLAUDE_PLUGIN_ROOT}/scripts/hq.mjs" dashboard $ARGUMENTS
 ```
 
-Then answer the question the user actually has, which is almost never "what does the table say".
-It is **what have I missed**. Lead with that:
+That writes and opens one page — no server, no scripts, just HTML. It stays fresh by running the
+command again, or by adding `--watch` to keep it regenerating on its own.
 
-- **Untouched** domains first. A domain with no workstreams is either finished or forgotten, and
-  the difference matters.
-- **Stale** next, oldest first — and say what it means: unverified, not necessarily wrong.
-- **Blocked** last, separating what is waiting on the user from what is waiting on someone else.
-  The first kind is the only kind they can act on right now.
+Do not stop at opening it. Also pull the same picture as text, so it lands in this conversation:
 
-Do not read the table back row by row. Two or three sentences of judgement is the whole value:
-which domain needs attention, which is fine despite looking bad, and what you would do first.
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/hq.mjs" dashboard --terminal $ARGUMENTS
+```
 
-Flags worth knowing: `--stale-hours N` to override the config threshold for one look, `--md` for a
-copy-pasteable summary, and `--html <file>` to write a self-contained page — no scripts, no network
-— that the user can keep open on a second monitor. Offer the HTML form if they mention wanting to
-keep an eye on things.
+Reply with the four lists, in this order, because that is the question the user actually has —
+**what have I missed** — not "what does the table say":
+
+- **Stale** — oldest first. Say what it means: unverified, not necessarily wrong.
+- **Blocked** — what is waiting, and on whom. Separate what the user can act on now from what
+  is waiting on someone else.
+- **Awaiting review** — dispatched work a department finished, that nobody has checked yet.
+- **Untouched** — a domain with no workstreams is either finished or forgotten, and the
+  difference matters.
+
+Keep it short: the lists themselves, plus one or two sentences of judgement — which domain needs
+attention today, which looks bad but isn't. Do not read the table back row by row.

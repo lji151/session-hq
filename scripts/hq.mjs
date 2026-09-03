@@ -15,7 +15,7 @@
  *   node hq.mjs done          <id> [--note "<line>"]
  *   node hq.mjs ack           <id>
  *   node hq.mjs dispatches    [--domain d] [--open|--awaiting-review|--all]
- *   node hq.mjs dashboard     [--stale-hours N] [--md | --html <file>]
+ *   node hq.mjs dashboard     [--watch [seconds]] [--no-open] [--terminal | --md | --html <file>]
  *   node hq.mjs doctor        [--json]
  *   node hq.mjs memory-lint   [--dir <dir>] [--json]
  *   node hq.mjs leak-check    [--denylist <file>] [--dir <dir>]
@@ -68,7 +68,7 @@ const USAGE = `session-hq
   hq.mjs done          <id> [--note "<line>"]      report a dispatched task finished
   hq.mjs ack           <id>                        review and close a finished dispatch
   hq.mjs dispatches    [--domain d] [--awaiting-review|--all]
-  hq.mjs dashboard     [--stale-hours N] [--md | --html <file>]   every domain on one screen
+  hq.mjs dashboard     [--watch [seconds]] [--no-open] [--terminal | --md]   one page, opened for you
   hq.mjs doctor        [--json]
   hq.mjs memory-lint   [--dir <dir>] [--json]
   hq.mjs leak-check    [--denylist <file>] [--dir <dir>]

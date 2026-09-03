@@ -1,6 +1,7 @@
 // Every domain on one screen, in three renderings.
 import fs from 'node:fs';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { isFile, expandHome, hoursSince, truncate, safeSlug } from './util.mjs';
 import { discoverConfig, statusPath } from './config.mjs';
 import { lastUpdatedAt, summariseDomain } from './status.mjs';
@@ -165,8 +166,15 @@ function esc(s) {
     .split('>').join('&gt;')
     .split('"').join('&quot;');
 }
-/** A single self-contained file: inline CSS, no script, no network. */
-export function renderHtml(d) {
+/**
+ * A single self-contained file: inline CSS, no script, no network.
+ *
+ * Layout is deliberate: the "what did I miss" lists (stale, blocked, awaiting
+ * review, untouched) lead, because that is the question a reader actually has.
+ * The domain table and the inbox/decisions counts follow, for people who want
+ * the detail. Pass `watchSeconds` to have the page refresh itself.
+ */
+export function renderHtml(d, { watchSeconds = null } = {}) {
   const rows = d.rows.map((r) => {
     const when = r.exists ? `${relTime(r.ageHours)}${r.stale ? ' <span class="tag">STALE</span>' : ''}` : 'no file';
     return `<tr${r.stale ? ' class="stale"' : ''}><td>${esc(r.domain)}</td><td>${when}</td>` +
@@ -177,10 +185,15 @@ export function renderHtml(d) {
     ? `<p class="empty">${empty}</p>`
     : `<ul>${items.join('')}</ul>`);
 
+  const refreshMeta = watchSeconds ? `\n<meta http-equiv="refresh" content="${watchSeconds}">` : '';
+  const footer = watchSeconds
+    ? `Auto-refreshing every ${watchSeconds}s &middot; generated ${esc(d.generatedAt.toISOString())}.`
+    : `Generated ${esc(d.generatedAt.toISOString())} &middot; run <code>hq dashboard</code> again, or <code>--watch</code>, to refresh.`;
+
   return `<!doctype html>
 <html lang="en">
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">${refreshMeta}
 <title>session-hq dashboard</title>
 <style>
   :root { color-scheme: light dark; --fg:#1a1a1a; --bg:#fbfbf9; --mut:#666; --line:#dcdcd6; --warn:#8a4b00; --warnbg:#fdf0dd; }
@@ -195,6 +208,7 @@ export function renderHtml(d) {
   h2 { font-size:.8rem; text-transform:uppercase; letter-spacing:.08em; color:var(--mut);
        margin:2rem 0 .5rem; border-bottom:1px solid var(--line); padding-bottom:.35rem; }
   .meta { color:var(--mut); margin:0 0 1.5rem; font-size:.85rem; }
+  .table-wrap { max-width: 100%; overflow-x: auto; }
   table { border-collapse:collapse; width:100%; }
   th { text-align:left; font-size:.72rem; text-transform:uppercase; letter-spacing:.08em;
        color:var(--mut); border-bottom:1px solid var(--line); padding:.4rem .6rem .4rem 0; font-weight:600; }
@@ -204,21 +218,18 @@ export function renderHtml(d) {
   .tag { background:var(--warnbg); color:var(--warn); padding:.05rem .4rem; border-radius:3px;
          font-size:.7rem; letter-spacing:.06em; }
   ul { margin:.25rem 0; padding-left:1.1rem; }
-  li { margin:.3rem 0; }
+  li { margin:.3rem 0; overflow-wrap: anywhere; }
   .dom { font-weight:700; }
   .empty { color:var(--mut); margin:.25rem 0; }
   footer { margin-top:2.5rem; color:var(--mut); font-size:.78rem; }
+  @media (max-width: 480px) {
+    body { padding: 1.25rem .75rem; }
+    h2 { margin-top: 1.5rem; }
+  }
 </style>
 <main>
   <h1>session-hq dashboard</h1>
   <p class="meta">${esc(d.hqRoot)} &middot; ${d.rows.length} domains &middot; stale after ${d.staleAfterHours}h &middot; generated ${esc(d.generatedAt.toISOString())}</p>
-
-  <table>
-    <thead><tr><th>Domain</th><th>Last updated</th><th class="n">Work</th><th class="n">Blocked</th><th class="n">Next</th><th class="n">Asked</th></tr></thead>
-    <tbody>
-${rows}
-    </tbody>
-  </table>
 
   <h2>Stale (over ${d.staleAfterHours}h)</h2>
   ${list(d.stale.map((r) => `<li><span class="dom">${esc(r.domain)}</span> &mdash; ${esc(relTime(r.ageHours))}</li>`), 'Nothing stale.')}
@@ -232,14 +243,91 @@ ${rows}
   <h2>Untouched</h2>
   ${list(d.untouched.map((r) => `<li><span class="dom">${esc(r.domain)}</span> &mdash; ${r.exists ? 'no workstreams yet' : 'no status file'}</li>`), 'Every domain has work recorded.')}
 
+  <h2>Domains</h2>
+  <div class="table-wrap">
+  <table>
+    <thead><tr><th>Domain</th><th>Last updated</th><th class="n">Work</th><th class="n">Blocked</th><th class="n">Next</th><th class="n">Asked</th></tr></thead>
+    <tbody>
+${rows}
+    </tbody>
+  </table>
+  </div>
+
   <h2>Inbox and decisions</h2>
   <p>${d.inboxCount} idea${d.inboxCount === 1 ? '' : 's'} waiting.</p>
   ${list(d.decisions.map((l) => `<li>${esc(l.replace(/^-\s*/, ''))}</li>`), 'No decisions recorded.')}
 
-  <footer>Static snapshot. Regenerate with <code>hq.mjs dashboard --html &lt;file&gt;</code>.</footer>
+  <footer>${footer}</footer>
 </main>
 </html>
 `;
+}
+
+/* ------------------------------------------------------------------- open */
+
+/** Best-effort, fire-and-forget open of a local file in the default browser. */
+function openInDefaultBrowser(filePath) {
+  try {
+    let cmd, args;
+    if (process.platform === 'win32') { cmd = 'cmd'; args = ['/c', 'start', '""', filePath]; }
+    else if (process.platform === 'darwin') { cmd = 'open'; args = [filePath]; }
+    else { cmd = 'xdg-open'; args = [filePath]; }
+    const child = spawn(cmd, args, { detached: true, stdio: 'ignore', windowsHide: true });
+    child.on('error', () => {}); // best-effort: the printed line already names the path
+    child.unref();
+  } catch {
+    // Same: the caller always prints the path regardless of whether this worked.
+  }
+}
+function oneLiner(outPath, watchSeconds) {
+  return watchSeconds
+    ? `dashboard: ${outPath} — refreshing every ${watchSeconds}s (Ctrl-C to stop)`
+    : `dashboard: ${outPath} — run \`hq dashboard\` again, or \`--watch\`, to refresh`;
+}
+
+/**
+ * The default view: one self-contained page, opened for you. `--watch [seconds]`
+ * keeps regenerating it in place until `--watch-iterations` (test-only) is hit,
+ * or Ctrl-C. Never blocks on the browser: it is spawned detached and unref'd.
+ */
+function runPageDashboard({ config, hqRoot, staleAfterHours, flags }) {
+  const outPath = path.join(hqRoot, 'dashboard.html');
+  const watching = flags.watch !== undefined;
+  let watchSeconds = null;
+  if (watching) {
+    watchSeconds = flags.watch === true ? 30 : Number(flags.watch);
+    if (!Number.isFinite(watchSeconds) || watchSeconds <= 0) {
+      console.error('hq dashboard: --watch must be a positive number of seconds');
+      process.exitCode = 1;
+      return;
+    }
+  }
+
+  const render = () => {
+    const data = collectDashboard(config, hqRoot, staleAfterHours);
+    fs.mkdirSync(path.dirname(outPath), { recursive: true });
+    fs.writeFileSync(outPath, renderHtml(data, { watchSeconds }), 'utf8');
+  };
+
+  render();
+  if (!flags['no-open']) openInDefaultBrowser(outPath);
+  console.log(oneLiner(outPath, watchSeconds));
+
+  if (!watching) return;
+
+  const maxIterations = flags['watch-iterations'] !== undefined ? Number(flags['watch-iterations']) : null;
+  let count = 1; // the render() above is the first iteration
+  if (maxIterations !== null && count >= maxIterations) return;
+
+  return new Promise((resolve) => {
+    const stop = () => { clearInterval(timer); process.off('SIGINT', stop); resolve(); };
+    const timer = setInterval(() => {
+      render();
+      count++;
+      if (maxIterations !== null && count >= maxIterations) stop();
+    }, watchSeconds * 1000);
+    process.on('SIGINT', stop);
+  });
 }
 
 /* ----------------------------------------------------------------- command */
@@ -261,14 +349,22 @@ export function cmdDashboard(flags) {
     return;
   }
 
-  const data = collectDashboard(config, hqRoot, staleAfterHours);
-
+  if (flags.terminal) {
+    console.log(renderTerminal(collectDashboard(config, hqRoot, staleAfterHours)));
+    return;
+  }
+  if (flags.md) {
+    console.log(renderMarkdown(collectDashboard(config, hqRoot, staleAfterHours)));
+    return;
+  }
   if (typeof flags.html === 'string') {
     const out = path.resolve(expandHome(flags.html));
     fs.mkdirSync(path.dirname(out), { recursive: true });
-    fs.writeFileSync(out, renderHtml(data), 'utf8');
+    fs.writeFileSync(out, renderHtml(collectDashboard(config, hqRoot, staleAfterHours)), 'utf8');
     console.log(`dashboard written to ${out}`);
     return;
   }
-  console.log(flags.md ? renderMarkdown(data) : renderTerminal(data));
+
+  // No view flag: the one page, opened for you. `--watch` keeps it live.
+  return runPageDashboard({ config, hqRoot, staleAfterHours, flags });
 }

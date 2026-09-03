@@ -149,7 +149,7 @@ describe('dispatch and the rest of the system', () => {
     hq(['done', id, '--note', 'graded and re-exported']);
     const open = newId('swap the outro card');
 
-    const { stdout } = hq(['dashboard']);
+    const { stdout } = hq(['dashboard', '--terminal']);
     assert.match(stdout, /DOMAIN\s+LAST UPDATED\s+WORK\s+BLOCKED\s+NEXT\s+ASKED/);
     assert.match(stdout, /AWAITING REVIEW/);
     assert.match(stdout, new RegExp(`${id}\\s+video`));
