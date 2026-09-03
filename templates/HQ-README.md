@@ -1,6 +1,6 @@
 # HQ
 
-The shared headquarters for every Claude Code session that works on these projects.
+The shared headquarters for every agent session that works on these projects.
 One folder, plain markdown, no database. Any session can read it; any session can append to it.
 
 Created {{DATE}} at `{{HQ_ROOT}}`.
@@ -17,7 +17,8 @@ Created {{DATE}} at `{{HQ_ROOT}}`.
 
 ## The protocol
 
-1. **At session start**, read your domain's `status-<domain>.md`. The plugin injects it for you.
+1. **At session start**, read your domain's `status-<domain>.md`. Your adapter injects it for you
+   (Claude Code hooks, `hq.mjs wrap`, or your agent's instruction file).
    If it is marked stale, verify anything you are about to depend on.
 2. **At session end**, update that same file: what changed, what is next, what is blocked,
    and **what you ruled out**. Edit the relevant section; do not rewrite the file.

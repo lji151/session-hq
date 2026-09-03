@@ -1,12 +1,14 @@
 # Contributing
 
-Thanks for looking. This is a small plugin with a deliberately small surface, so the most useful
-contributions are usually sharpening what is here rather than adding to it.
+Thanks for looking. The product is a markdown HQ folder plus a dependency-free Node CLI; the
+Claude Code plugin is the first adapter on top of it. The surface is deliberately small, so the
+most useful contributions are usually sharpening what is here rather than adding to it.
 
 ## Setup
 
-You need Claude Code and Node ≥ 18. There is nothing to install — the plugin has no dependencies
-and no build step, which is a constraint worth preserving.
+You need Node ≥ 18. Claude Code is needed only for the plugin adapter; the CLI and its tests run
+without it. There is nothing to install — no dependencies and no build step, which is a constraint
+worth preserving.
 
 ```bash
 git clone https://github.com/your-github-username/session-hq
@@ -15,7 +17,14 @@ node --test                      # 40+ tests, no network, no fixtures on disk
 node scripts/hq.mjs doctor       # against your own HQ, if you have one
 ```
 
-To try your working copy in a real session:
+To try the generic adapter, no plugin required:
+
+```bash
+node scripts/hq.mjs init --domains video,apps
+node scripts/hq.mjs wrap --domain apps -- <your agent command>
+```
+
+To try your working copy as a Claude Code plugin:
 
 ```bash
 claude plugin marketplace add ./          # from the repo root
@@ -71,10 +80,11 @@ local denylist, at minimum grep your diff for your own username and home directo
   to need a library, it probably needs less code instead.
 - **ESM**, `.mjs`, and every path handled through `node:path`. Windows is a first-class target —
   do not concatenate paths with `/`, and do not assume a POSIX home directory.
-- **Hooks must never crash a session.** Every hook path catches its own errors and exits 0. A
-  plugin that can break someone's session on a malformed config file is worse than no plugin.
-- **Hooks must stay silent when they have nothing to say.** No config, no domain, no work done —
-  print nothing. Noise is what gets a plugin uninstalled.
+- **Adapters must never crash a session.** Every hook and wrapper path catches its own errors and
+  exits 0, and `wrap` runs the user's command even when the HQ is missing. Breaking someone's
+  workflow over a malformed config file is worse than not being installed.
+- **Adapters must stay silent when they have nothing to say.** No config, no domain, no work done —
+  print nothing. Noise is what gets a tool removed.
 - **Comments explain why, not what.** If a line needs a comment saying what it does, rename
   something instead.
 
@@ -100,8 +110,9 @@ Prose in this repo aims to be specific rather than enthusiastic. Concretely:
 
 ## Scope
 
-Things that fit: better staleness handling, a status-file linter, more recipes, ergonomics for
-teams sharing an HQ in git, translations.
+Things that fit: **adapters for other agents** (see [docs/adapters.md](docs/adapters.md) — the two
+calls an adapter must make are documented there), better staleness handling, a status-file linter,
+more recipes, ergonomics for teams sharing an HQ in git, translations.
 
 Things that do not: anything involving multiple accounts or usage limits, API proxying, a daemon
 or background service, a dependency, or automatic generation of status content. The last one is

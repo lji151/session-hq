@@ -63,7 +63,7 @@ flowchart TB
 
 Three components:
 
-**Injection (SessionStart, optionally PreCompact).** The session's domain file is read into
+**Injection (SessionStart and optionally PreCompact under Claude Code; `wrap` elsewhere).** The session's domain file is read into
 context before the first user message, trimmed to a line budget, with a staleness banner when it
 is older than the configured threshold. The session starts already knowing where things stand.
 
@@ -71,7 +71,7 @@ is older than the configured threshold. The session starts already knowing where
 Stop check distinguish "this session did nothing, so it owes nothing" from "this session did
 thirty-four things and wrote none of them down".
 
-**Checking (Stop).** Hash the status file at session start; compare at stop. Unchanged, after real
+**Checking (Stop under Claude Code; process exit under `wrap`).** Hash the status file at session start; compare at stop. Unchanged, after real
 work, produces a reminder — or, if configured, a block.
 
 The plugin never writes status content itself. It creates the file, injects it, and asks. What
@@ -109,6 +109,13 @@ done, the user has what they wanted, and the write-up is pure overhead paid by a
 Hooks are not persuasion. SessionStart puts the file in context whether or not anyone remembered;
 Stop notices the omission at the exact moment it happens, when the session still has the context
 to fix it in one paragraph. A reminder ten minutes later would need the whole session reconstructed.
+
+Hooks are, however, only the *strongest* adapter, not the only one. The protocol itself is a
+folder and a CLI, and `hq.mjs wrap` runs the same two moments around any agent command: print
+the status before, check the file after. It cannot see inside the session, so it substitutes
+elapsed time for the tool counter and cannot refuse an exit — by the time it regains control
+the agent is gone. That is the honest cost of being agent-neutral, and it is set out in
+[adapters.md](adapters.md).
 
 The Stop hook can block (`update.enforce: true`) but does not by default. A tool that fights you
 gets uninstalled, and an uninstalled tool enforces nothing. Blocking is available for teams where

@@ -1,7 +1,7 @@
 {
   "name": "session-hq",
   "version": "0.1.0",
-  "description": "A shared, file-based headquarters for many Claude Code sessions: per-domain status files read at session start and updated at session end, an ideas inbox, and a decisions log, enforced by hooks with configurable cadence.",
+  "description": "A shared, file-based headquarters for AI agent sessions (Claude Code plugin + agent-neutral CLI): per-domain status files read at session start and updated at session end, an ideas inbox, and a decisions log.",
   "author": {
     "name": "Your Name",
     "email": "you@example.com",
@@ -16,6 +16,7 @@
     "hooks",
     "orchestration",
     "multi-session",
-    "handoff"
+    "handoff",
+    "agent-neutral"
   ]
 }

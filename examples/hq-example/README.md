@@ -5,7 +5,7 @@ invented people, invented numbers. It exists so you can see what a *good* set of
 like before you write your own.
 
 Note that `hq.config.json` here has no `hqRoot`, so the folder containing it is the HQ root. Copy
-this directory somewhere, point `HQ_ROOT` at it, and the plugin will work against it.
+this directory somewhere, point `HQ_ROOT` at it, and any adapter will work against it.
 
 ## Files
 
@@ -19,7 +19,7 @@ this directory somewhere, point `HQ_ROOT` at it, and the plugin will work agains
 
 ## The protocol
 
-1. **At session start**, read your domain's `status-<domain>.md`. The plugin injects it for you.
+1. **At session start**, read your domain's `status-<domain>.md`. Your adapter injects it for you.
 2. **At session end**, update the block you touched: what changed, what is next, what is blocked,
    and **what you ruled out**.
 3. **Ideas** go to `ideas-inbox.md`. **Decisions** go to `decisions.md`. Neither goes in a status file.

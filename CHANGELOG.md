@@ -13,7 +13,11 @@ Initial release.
 ### Added
 
 - **HQ folder protocol.** Per-domain `status-<domain>.md` files, an ideas inbox, and a decision
-  log, created and repaired by `/hq-init`.
+  log, created and repaired by `hq.mjs init` (or `/hq-init` under Claude Code). Plain markdown and
+  a dependency-free Node CLI are the product; adapters connect agents to them.
+- **`hq.mjs wrap`** — the agent-neutral adapter. Prints the injection, runs any agent command with
+  the terminal attached, propagates its exit code, and checks on exit whether anything was written
+  back. Handles Windows `.cmd`/`.bat` shims via a shell fallback.
 - **SessionStart injection.** The session's domain status file is injected at session start,
   trimmed to `inject.maxLines`, with a staleness banner past `inject.staleAfterHours`. Staleness
   is read from an explicit `<!-- hq:updated ... -->` stamp, falling back to file mtime.
@@ -37,7 +41,8 @@ Initial release.
 - **Templates** for the HQ files, the memory layer, and subagent briefs.
 - **Recipes** for a chat notifier, multi-shot deadline reminders across three schedulers, a
   conversation archiver, and screen capture.
-- **Docs**: design and tradeoffs, a full config reference, and three case studies.
+- **Docs**: an adapter matrix with a "writing an adapter" guide, design and tradeoffs, a full
+  config reference, and three case studies.
 - **Example HQ** under `examples/hq-example/` with three fictional domains and filled-in entries.
 - Korean README.
 
@@ -51,9 +56,9 @@ Initial release.
 
 ### Notes
 
-- Requires Node 18 or newer, which Claude Code already requires. No other dependencies.
+- Requires Node 18 or newer. Claude Code is needed only for the plugin adapter.
 - Hooks load at session start, so Claude Code must be restarted after installing.
-- Hooks stay silent on a machine with no HQ configured.
+- Every adapter stays silent on a machine with no HQ configured; `wrap` runs the command anyway.
 
 [Unreleased]: https://github.com/your-github-username/session-hq/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/your-github-username/session-hq/releases/tag/v0.1.0

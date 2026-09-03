@@ -1,10 +1,10 @@
 # session-hq
 
-**You run five Claude Code sessions. None of them knows what the others did yesterday.**
+**You run five agent sessions. None of them knows what the others did yesterday.**
 
-session-hq gives them a shared, file-based headquarters: one markdown file per domain that every
-session reads at start and updates at end, plus an ideas inbox and a decision log — enforced by
-hooks, at a cadence you choose.
+session-hq is a shared, file-based headquarters for AI coding-agent sessions — Claude Code, Codex,
+Gemini CLI, Cursor, aider, or a local model in a shell — one markdown status file per domain, read
+at session start, written at session end.
 
 [English](README.md) · [한국어](README.ko.md)
 [![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
@@ -12,6 +12,9 @@ hooks, at a cadence you choose.
 ---
 
 ## 60 seconds
+
+Shown with Claude Code, where the hooks make it automatic. Every other agent runs the same
+protocol through [`wrap`](docs/adapters.md) or its own instruction file.
 
 ```console
 $ claude
@@ -54,53 +57,116 @@ Updated `status-apps.md`:
 
 <!-- TODO: replace with a recording -->
 
-The line that pays for the whole plugin is **Ruled out**. It is the one every session is tempted
-to skip, and the one that stops three sessions independently rediscovering the same dead end.
+The line that pays for the whole thing is **Ruled out**. It is the one every session is tempted to
+skip, and the one that stops three sessions independently rediscovering the same dead end.
 
-## Install
+## What it is
 
-Requires Claude Code and Node ≥ 18. No other dependencies.
+A folder of markdown files and a dependency-free Node CLI. That is the whole product; the Claude
+Code plugin is one adapter on top of it.
+
+```
+~/hq/
+  hq.config.json      cadence and layout
+  status-video.md     one file per domain — a lane of work a session tends to be about
+  status-apps.md
+  status-business.md
+  ideas-inbox.md      one line per idea. Not a commitment
+  decisions.md        one line per decision. Append-only, never edited
+  .state/             per-session bookkeeping, written by the adapters
+```
+
+A status file is `###` blocks, one per workstream, each with five fields:
+
+```
+### Payment retry queue
+- Status: where it actually stands, one line. Not "worked on X" — that is a timesheet
+- Next: a file, a command, or a person. Never "continue"
+- Blocked on: what is waiting and on whom. "Nothing" is a valid answer
+- Ruled out: what you tried that did not work, with the evidence
+- Updated: YYYY-MM-DD (which session)
+```
+
+**Ruled out is the point.** Three sessions each spending forty minutes rediscovering the same
+platform limitation is two hours lost to a line that takes thirty seconds to write. Record
+eliminations with their evidence — the error, the measurement, the comparison — because a reader
+who cannot tell whether you checked properly will just check again.
+
+Alongside the status files sit `ideas-inbox.md` (one dated line per idea, explicitly not a
+commitment) and `decisions.md` (one dated line per decision, append-only — a reversal is a new
+line, never an edit, because the file's value is that it is honest about the order things
+happened in).
+
+It is plain markdown, so put the folder wherever it reaches your other sessions: a git repo, a
+synced drive, a notes vault. Nothing here needs a database, a daemon, or a network.
+
+## Quick start
+
+### Claude Code (automatic)
+
+Hooks read and check the file for you. Requires Node ≥ 18, which Claude Code already needs.
 
 ```bash
-# Add this repo as a marketplace, then install the plugin from it
 claude plugin marketplace add your-github-username/session-hq
 claude plugin install session-hq@session-hq
+```
 
-# Or from a local clone
+Then `/hq-init` in Claude Code, and **restart** — hooks load at session start, so the session that
+ran it is still running without them. Give each session a domain with `HQ_DOMAIN`, or set
+`defaultDomain` for a machine that mostly does one thing. Check with `/hq-doctor`.
+
+### Any other agent (generic)
+
+Clone the repo, create the HQ, and wrap your agent. No plugin, no hooks.
+
+```bash
 git clone https://github.com/your-github-username/session-hq
-claude plugin marketplace add ./session-hq
-claude plugin install session-hq@session-hq
+node session-hq/scripts/hq.mjs init --domains video,apps,business
 ```
 
-Then, in Claude Code:
+`wrap` prints the domain's status before your agent starts, then checks on the way out whether
+anything was written back. Everything after `--` is your command, passed through untouched, and
+its exit code is propagated:
 
+```bash
+node scripts/hq.mjs wrap --domain video  -- codex
+node scripts/hq.mjs wrap --domain apps   -- aider --model <your-model> src/
+node scripts/hq.mjs wrap --domain apps   -- my-local-agent --serve
 ```
-/hq-init
+
+Make it an alias so nobody has to remember:
+
+```bash
+alias agent='node ~/session-hq/scripts/hq.mjs wrap --domain apps -- my-local-agent'
 ```
 
-It asks which domains you want, creates `~/hq` with a config, a status file per domain, an ideas
-inbox and a decision log, and tells you what to do next. **Restart Claude Code afterwards** —
-hooks load at session start, so the session that ran `/hq-init` is still running without them.
+**Or point the agent at the protocol itself.** Paste three lines into its instruction file —
+`AGENTS.md`, `GEMINI.md`, `.cursorrules`, a system prompt, whatever your tool reads:
 
-Give each session a domain by exporting `HQ_DOMAIN` before launching it, or set `defaultDomain` in
-`hq.config.json` if a machine mostly does one kind of work.
+```markdown
+At the start of a session, run: node ~/session-hq/scripts/hq.mjs inject --print --domain apps
+Record ideas with `hq.mjs inbox "<line>"` and decisions with `hq.mjs decide "<line>"`.
+Before finishing, update status-apps.md: Status, Next, Blocked on, Ruled out, Updated.
+```
 
-Check it with `claude plugin list`, `/hooks`, and `/hq-doctor`.
+This is a **convention, not enforcement** — nothing makes the agent comply. `wrap` at least
+guarantees the read happens and the omission is noticed. See [docs/adapters.md](docs/adapters.md)
+for what each adapter actually guarantees.
 
 ## How it works
 
 ```mermaid
 flowchart LR
-    subgraph sessions["Claude Code sessions"]
-        S1["session A<br/>HQ_DOMAIN=apps"]
-        S2["session B<br/>HQ_DOMAIN=video"]
+    subgraph sessions["agent sessions"]
+        S1["session A<br/>domain: apps"]
+        S2["session B<br/>domain: video"]
         S3["session C<br/>tomorrow"]
     end
 
-    subgraph hooks["plugin hooks"]
-        H1["SessionStart<br/>PreCompact"]
-        H2["PostToolUse"]
-        H3["Stop"]
+    subgraph adapters["adapters: Claude Code hooks · wrap · instruction file"]
+        H1["start<br/>inject"]
+        H2["during<br/>count"]
+        H3["end<br/>check"]
     end
 
     subgraph hq["HQ folder (plain markdown)"]
@@ -112,30 +178,31 @@ flowchart LR
     end
 
     S1 & S2 & S3 --> H1
-    H1 -- "inject status,<br/>flag if stale" --> S1
+    H1 -- "read status,<br/>flag if stale" --> S1
     S1 --> H2
-    H2 -- "count tools,<br/>optional nudge" --> F5
+    H2 -- "counter" --> F5
     S1 --> H3
     H3 -- "unchanged?<br/>remind or block" --> S1
-    S1 -- "/hq-update" --> F1
-    S2 -- "/hq-update" --> F2
-    S1 -- "/hq-inbox" --> F3
-    S1 -- "/hq-decide" --> F4
+    S1 -- "write back" --> F1
+    S2 -- "write back" --> F2
+    S1 -- "inbox" --> F3
+    S1 -- "decide" --> F4
     F1 --> H1
 ```
 
-Four moving parts:
+Three moments, however they are triggered:
 
-1. **SessionStart** injects the session's `status-<domain>.md`, trimmed to `inject.maxLines`,
-   with a staleness banner when the file is older than `inject.staleAfterHours`.
-2. **PostToolUse** counts tool calls into `<hqRoot>/.state/<session-id>.json`, and in `periodic`
-   mode emits a throttled nudge.
-3. **Stop** checks whether the status file changed since the session started. If the session did
-   real work and wrote nothing back, it says so.
-4. **You** write the actual content, through `/hq-update`. The plugin never invents status.
+1. **Start** — the session's `status-<domain>.md` is read into context, trimmed to
+   `inject.maxLines`, with a staleness banner when it is older than `inject.staleAfterHours`.
+2. **During** — activity is counted into `.state/<session-id>.json`. This is what lets the end
+   check distinguish "did nothing" from "did thirty-four things and wrote none of them down".
+   Only the Claude Code hooks can see individual tool calls; `wrap` uses elapsed time instead.
+3. **End** — the status file is hashed against its value at session start. Unchanged, after real
+   work, produces a reminder — or, if configured, a block.
 
-The HQ is plain markdown in a folder you choose. Put it in a git repo, a synced drive, or a notes
-vault — anything that gets it to the other sessions.
+**Nothing writes status content for you.** The adapters create the file, read it, and ask. What
+goes in comes from a session that actually did the work. A generated entry is a plausible-sounding
+entry, which is exactly what makes a file stop being trusted.
 
 ## Configure the cadence
 
@@ -175,6 +242,11 @@ Three cadences that people actually use:
   Appropriate for shared repos where a missed handoff costs someone else a morning. It uses the
   Stop hook's blocking decision, and it will feel like it.
 
+**Running a local model with a small context window?** `inject.maxLines` is the knob that matters.
+The default of 60 suits large-context hosted models; on an 8k window, 15–25 keeps the handoff
+useful without eating the budget you needed for the actual work. Keeping the status files short is
+the other half of that, and it is worth doing regardless.
+
 Full reference: [docs/config.md](docs/config.md).
 
 ## Two conventions, shipped as skills
@@ -182,10 +254,10 @@ Full reference: [docs/config.md](docs/config.md).
 The status files are the mechanism. These are the practices that make them worth having.
 
 **[layered-memory](skills/layered-memory/SKILL.md)** — `MEMORY.md` → `index-<domain>.md` → one
-fact per file. The session reads the index that matches its work and nothing else, so the cost of
+fact per file. The session reads the index matching its work and nothing else, so the cost of
 remembering scales with relevance instead of volume. Includes the frontmatter schema, the
 triage-first rule, and the Why / How-to-apply format that keeps a correction from being argued
-away six weeks later. Audit an existing directory with `/memory-lint`.
+away six weeks later. Audit a directory with `node scripts/hq.mjs memory-lint` (or `/memory-lint`).
 
 **[orchestrator-routing](skills/orchestrator-routing/SKILL.md)** — a coordinator that writes
 briefs and reviews output, with coding and research delegated to other tiers. Includes the brief
@@ -195,51 +267,40 @@ review is not delegation, it is just moving the work.
 **[hq-protocol](skills/hq-protocol/SKILL.md)** is the third — when to read, when to write, what a
 real status entry contains, and how to handle staleness and conflicting entries.
 
-## How this relates to Claude Code's own features
+They are packaged as Claude Code skills so that plugin can auto-activate them, but each is a
+single plain markdown file with nothing Claude-specific in the body. Point any agent at the file,
+or paste it into a system prompt.
 
-Accurately, and without overclaiming:
+## If you use Claude Code
+
+How this sits alongside the native features, accurately and without overclaiming:
 
 | | Scope | Lifetime |
 |---|---|---|
-| **Cross-session messaging** (native) | between sessions running now | live, ephemeral — gone when the session ends |
-| **session-hq** | between sessions across days | persistent, async — outlives the session that wrote it |
+| **Cross-session messaging** (native) | between sessions running now | live, ephemeral |
+| **session-hq** | between sessions across days | persistent, async |
 | **Auto-memory** (native) | facts about one project | per project |
 | **session-hq** | state across many projects | one HQ, many domains |
 
-They compose rather than compete. Native messaging is how you ask the session next door a
-question right now; session-hq is how you find out what it concluded last Tuesday. Auto-memory
-remembers how *this repo* works; the HQ remembers what is currently happening across all of them.
-If you only ever run one session on one project, you probably do not need this plugin.
-
-## Using the protocol without Claude Code
-
-The HQ is plain markdown, and `scripts/hq.mjs` is a standalone Node CLI with no dependency on
-Claude Code — it reads config from disk and hook payloads from stdin. Any agent, or a person, can
-run the protocol by hand:
-
-```bash
-node scripts/hq.mjs inject --print --domain apps   # at session start
-node scripts/hq.mjs inbox "an idea"                # also: decide, update-check, doctor
-```
-
-Wire that into a shell alias, a wrapper script, or your agent's instruction file (`AGENTS.md`,
-`GEMINI.md`, `.cursorrules`). What Claude Code adds is the automatic part: hooks that inject at
-session start and check at stop, so nobody has to remember. Adapters welcome — see
-[CONTRIBUTING.md](CONTRIBUTING.md).
+They compose rather than compete. Native messaging is how you ask the session next door a question
+right now; session-hq is how you find out what it concluded last Tuesday. Auto-memory remembers
+how *this repo* works; the HQ remembers what is currently happening across all of them. If you only
+ever run one session on one project, you probably do not need this.
 
 ## Non-goals
 
 - **No multi-account anything.** This is one account with many sessions. There is no feature here
   for working around usage limits, and requests to add one will be declined.
 - **No API proxying**, no traffic-level model routing, no request interception. (The
-  `orchestrator-routing` skill is a prompt-level convention for choosing a tier when
-  delegating, not a network layer.)
-- **No dependencies** beyond the Node that Claude Code already requires. No native modules, no
-  install step, no daemon.
-- **No automatic writing.** The plugin reminds; it never fabricates a status entry. A status file
-  is only worth reading if a human or a session that actually did the work wrote it.
+  `orchestrator-routing` skill is a prompt-level convention for choosing a tier when delegating,
+  not a network layer.)
+- **No dependencies** beyond Node ≥ 18. No native modules, no install step, no daemon.
+- **No automatic writing.** The adapters remind; they never fabricate a status entry.
 - **Not an archive.** The HQ holds current state. For full transcripts see
   [recipes/conversation-archiver.md](recipes/conversation-archiver.md).
+- **No claims about other tools' internals.** `wrap` and the instruction-file pattern work by
+  running a command and by asking politely. Where another tool has its own hook system, an adapter
+  built on it would be welcome — see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Recipes
 
@@ -248,18 +309,19 @@ adapt them without inheriting anyone's infrastructure:
 
 - [notifier-telegram.md](recipes/notifier-telegram.md) — push a status change to a chat
 - [deadline-reminder.md](recipes/deadline-reminder.md) — scheduled reminders on Windows, macOS, Linux
-- [conversation-archiver.md](recipes/conversation-archiver.md) — Stop hook to a markdown vault
+- [conversation-archiver.md](recipes/conversation-archiver.md) — a transcript archive
 - [screen-look.md](recipes/screen-look.md) — let a session see the screen
 
 ## Docs
 
+- [docs/adapters.md](docs/adapters.md) — the three adapters, what each guarantees, how to write one
 - [docs/design.md](docs/design.md) — the problem, the architecture, and the tradeoffs
-- [docs/config.md](docs/config.md) — every configuration key
+- [docs/config.md](docs/config.md) — every configuration key, and the `wrap` reference
 - [docs/case-studies.md](docs/case-studies.md) — three stories about what goes wrong without this
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). Run `node --test test/` and
+See [CONTRIBUTING.md](CONTRIBUTING.md). Run `node --test` and
 `node scripts/leak-check.mjs --denylist <your denylist>` before opening a PR.
 
 ## License

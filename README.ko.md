@@ -1,10 +1,10 @@
 # session-hq
 
-**Claude Code 세션을 다섯 개 돌린다. 그런데 어느 세션도 다른 세션이 어제 무엇을 했는지 모른다.**
+**에이전트 세션을 다섯 개 돌린다. 그런데 어느 세션도 다른 세션이 어제 무엇을 했는지 모른다.**
 
-session-hq는 그 세션들에게 파일 기반의 공유 본부(HQ)를 제공한다. 도메인마다 마크다운 파일 하나를 두고,
-모든 세션이 시작할 때 그것을 읽고 끝날 때 갱신한다. 아이디어 인박스와 결정 로그도 함께 제공되며,
-전 과정은 훅으로 강제되고 그 주기는 사용자가 정한다.
+session-hq는 AI 코딩 에이전트 세션들을 위한 파일 기반 공유 본부(HQ)다. Claude Code, Codex,
+Gemini CLI, Cursor, aider, 혹은 셸에서 돌리는 로컬 모델까지 — 도메인마다 마크다운 상태 파일 하나를
+두고, 세션 시작 시 읽고 세션 종료 시 기록한다.
 
 [English](README.md) · [한국어](README.ko.md)
 [![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
@@ -12,6 +12,9 @@ session-hq는 그 세션들에게 파일 기반의 공유 본부(HQ)를 제공�
 ---
 
 ## 60초 데모
+
+훅이 있어 자동으로 동작하는 Claude Code 기준 화면이다. 다른 에이전트는 [`wrap`](docs/adapters.md)
+이나 각자의 지시 파일로 같은 프로토콜을 돌린다.
 
 ```console
 $ claude
@@ -54,53 +57,113 @@ Last updated 19h ago (from stamp).
 
 <!-- TODO: 실제 녹화본으로 교체 -->
 
-이 플러그인의 값어치를 혼자 감당하는 항목은 **배제됨(Ruled out)** 이다. 모든 세션이 가장 생략하고 싶어 하는
-줄이자, 세 개의 세션이 각자 똑같은 막다른 길을 다시 발견하는 것을 막아 주는 유일한 줄이다.
+이 전체의 값어치를 혼자 감당하는 항목은 **배제됨(Ruled out)** 이다. 모든 세션이 가장 생략하고 싶어
+하는 줄이자, 세 개의 세션이 각자 똑같은 막다른 길을 다시 발견하는 것을 막아 주는 유일한 줄이다.
 
-## 설치
+## 무엇인가
 
-Claude Code와 Node 18 이상이 필요하다. 그 외 의존성은 없다.
+마크다운 파일이 담긴 폴더 하나와, 의존성 없는 Node CLI 하나. 이 둘이 제품 전부이고, Claude Code
+플러그인은 그 위에 얹힌 어댑터 하나일 뿐이다.
+
+```
+~/hq/
+  hq.config.json      주기와 레이아웃 설정
+  status-video.md     도메인별 파일 하나 — 한 세션이 통째로 다루게 되는 작업 갈래
+  status-apps.md
+  status-business.md
+  ideas-inbox.md      아이디어 한 줄씩. 약속이 아니다
+  decisions.md        결정 한 줄씩. 추가만 하고 수정하지 않는다
+  .state/             어댑터가 쓰는 세션별 기록. 사람이 읽을 것은 아니다
+```
+
+상태 파일은 작업 갈래마다 `###` 블록 하나씩이고, 각 블록에 다섯 개 항목이 들어간다.
+
+```
+### 결제 재시도 큐
+- 상태: 실제로 어디까지 왔는지 한 줄. "X 작업함"은 상태가 아니라 근무일지다
+- 다음: 파일·명령어·사람 중 하나. "이어서 진행"은 안 된다
+- 대기: 무엇이 누구를 기다리는지. "없음"도 유효한 답이다
+- 배제됨: 시도했는데 안 된 것과 그 근거
+- 갱신: YYYY-MM-DD (어느 세션인지)
+```
+
+**핵심은 배제됨이다.** 세 세션이 각각 40분씩 같은 플랫폼 제약을 다시 발견하는 것은, 30초면 쓸 수 있는
+한 줄 때문에 두 시간을 날리는 일이다. 제거한 가설은 반드시 근거와 함께 적는다 — 에러 메시지, 측정값,
+비교 결과. 제대로 확인한 것인지 판단할 수 없는 독자는 어차피 다시 확인하기 때문이다.
+
+상태 파일 옆에는 `ideas-inbox.md`(아이디어를 날짜와 함께 한 줄씩, 명시적으로 약속이 아님)와
+`decisions.md`(결정을 날짜와 함께 한 줄씩, 추가 전용 — 번복도 수정이 아니라 새 줄로 적는다. 이 파일의
+가치는 일이 벌어진 순서에 대해 정직하다는 데 있다)가 놓인다.
+
+순수 마크다운이므로 다른 세션에 닿기만 하면 어디에 두어도 된다. git 저장소, 동기화 드라이브, 노트
+볼트 무엇이든. 데이터베이스도, 데몬도, 네트워크도 필요 없다.
+
+## 빠른 시작
+
+### Claude Code (자동)
+
+훅이 읽기와 검사를 대신 해 준다. Claude Code가 이미 요구하는 Node 18 이상이면 된다.
 
 ```bash
-# 이 저장소를 마켓플레이스로 등록한 뒤 플러그인을 설치한다
 claude plugin marketplace add your-github-username/session-hq
 claude plugin install session-hq@session-hq
+```
 
-# 로컬 클론에서 설치하는 경우
+그다음 Claude Code에서 `/hq-init`을 실행하고 **재시작**한다. 훅은 세션 시작 시점에 로드되므로 방금
+실행한 세션은 아직 훅 없이 돌아가고 있다. 세션별 도메인은 `HQ_DOMAIN`으로 지정하고, 한 종류의 작업만
+하는 머신이면 `defaultDomain`을 설정한다. 확인은 `/hq-doctor`로 한다.
+
+### 그 외 모든 에이전트 (범용)
+
+저장소를 클론하고, HQ를 만들고, 쓰던 에이전트를 감싸면 된다. 플러그인도 훅도 필요 없다.
+
+```bash
 git clone https://github.com/your-github-username/session-hq
-claude plugin marketplace add ./session-hq
-claude plugin install session-hq@session-hq
+node session-hq/scripts/hq.mjs init --domains video,apps,business
 ```
 
-그다음 Claude Code 안에서:
+`wrap`은 에이전트가 시작되기 전에 해당 도메인의 상태를 출력하고, 끝난 뒤에 무언가 기록되었는지
+확인한다. `--` 뒤는 전부 그대로 전달되는 사용자의 명령이며, 종료 코드도 그대로 전파된다.
 
+```bash
+node scripts/hq.mjs wrap --domain video  -- codex
+node scripts/hq.mjs wrap --domain apps   -- aider --model <your-model> src/
+node scripts/hq.mjs wrap --domain apps   -- my-local-agent --serve
 ```
-/hq-init
+
+아무도 기억할 필요가 없도록 별칭으로 만들어 두자.
+
+```bash
+alias agent='node ~/session-hq/scripts/hq.mjs wrap --domain apps -- my-local-agent'
 ```
 
-어떤 도메인을 쓸지 물어본 뒤 `~/hq`에 설정 파일, 도메인별 상태 파일, 아이디어 인박스, 결정 로그를 만들고
-다음에 할 일을 알려 준다. **끝나면 Claude Code를 재시작해야 한다.** 훅은 세션 시작 시점에 로드되므로,
-`/hq-init`을 실행한 그 세션은 아직 훅 없이 돌아가고 있다.
+**또는 에이전트에게 프로토콜 자체를 알려 줘도 된다.** 쓰는 도구가 읽는 지시 파일(`AGENTS.md`,
+`GEMINI.md`, `.cursorrules`, 시스템 프롬프트 등)에 세 줄을 붙여 넣는다.
 
-각 세션에 도메인을 지정하려면 세션을 띄우기 전에 `HQ_DOMAIN` 환경 변수를 설정하거나, 한 종류의 작업만 하는
-머신이라면 `hq.config.json`의 `defaultDomain`을 설정한다.
+```markdown
+세션 시작 시 실행: node ~/session-hq/scripts/hq.mjs inject --print --domain apps
+아이디어는 `hq.mjs inbox "<한 줄>"`, 결정은 `hq.mjs decide "<한 줄>"` 로 기록할 것.
+끝내기 전에 status-apps.md 갱신: 상태 / 다음 / 대기 / 배제됨 / 갱신일.
+```
 
-확인은 `claude plugin list`, `/hooks`, `/hq-doctor`로 한다.
+이것은 **강제가 아니라 관행이다.** 에이전트가 따르도록 만드는 장치가 없다. 최소한 `wrap`은 읽기가
+실제로 일어나고 누락이 발견되는 것까지는 보장한다. 각 어댑터가 실제로 무엇을 보장하는지는
+[docs/adapters.md](docs/adapters.md)를 참고할 것.
 
 ## 동작 방식
 
 ```mermaid
 flowchart LR
-    subgraph sessions["Claude Code 세션들"]
-        S1["세션 A<br/>HQ_DOMAIN=apps"]
-        S2["세션 B<br/>HQ_DOMAIN=video"]
+    subgraph sessions["에이전트 세션들"]
+        S1["세션 A<br/>도메인: apps"]
+        S2["세션 B<br/>도메인: video"]
         S3["세션 C<br/>내일"]
     end
 
-    subgraph hooks["플러그인 훅"]
-        H1["SessionStart<br/>PreCompact"]
-        H2["PostToolUse"]
-        H3["Stop"]
+    subgraph adapters["어댑터: Claude Code 훅 · wrap · 지시 파일"]
+        H1["시작<br/>주입"]
+        H2["도중<br/>계수"]
+        H3["종료<br/>검사"]
     end
 
     subgraph hq["HQ 폴더 (순수 마크다운)"]
@@ -112,30 +175,31 @@ flowchart LR
     end
 
     S1 & S2 & S3 --> H1
-    H1 -- "상태 주입,<br/>오래되면 경고" --> S1
+    H1 -- "상태 읽기,<br/>오래되면 경고" --> S1
     S1 --> H2
-    H2 -- "툴 호출 계수,<br/>선택적 알림" --> F5
+    H2 -- "카운터" --> F5
     S1 --> H3
     H3 -- "미갱신?<br/>알림 또는 차단" --> S1
-    S1 -- "/hq-update" --> F1
-    S2 -- "/hq-update" --> F2
-    S1 -- "/hq-inbox" --> F3
-    S1 -- "/hq-decide" --> F4
+    S1 -- "기록" --> F1
+    S2 -- "기록" --> F2
+    S1 -- "inbox" --> F3
+    S1 -- "decide" --> F4
     F1 --> H1
 ```
 
-구성 요소는 네 가지다.
+무엇이 촉발하든 지점은 세 개다.
 
-1. **SessionStart**가 해당 세션의 `status-<domain>.md`를 `inject.maxLines` 만큼 잘라서 주입한다.
-   파일이 `inject.staleAfterHours`보다 오래되었으면 경고 배너가 붙는다.
-2. **PostToolUse**가 툴 호출 횟수를 `<hqRoot>/.state/<session-id>.json`에 기록하고, `periodic` 모드에서는
-   조절된 간격으로 알림을 보낸다.
-3. **Stop**이 세션 시작 이후 상태 파일이 바뀌었는지 검사한다. 실제로 작업을 했는데 아무것도 기록하지
-   않았다면 그 사실을 알린다.
-4. **내용은 사람이 쓴다.** `/hq-update`를 통해서만 기록된다. 플러그인이 상태를 지어내는 일은 없다.
+1. **시작** — 해당 세션의 `status-<domain>.md`를 `inject.maxLines`만큼 잘라 컨텍스트에 넣는다.
+   `inject.staleAfterHours`보다 오래되었으면 경고 배너가 붙는다.
+2. **도중** — 활동량을 `.state/<session-id>.json`에 센다. 이것이 "아무것도 안 한 세션"과 "서른네 가지를
+   해 놓고 하나도 기록하지 않은 세션"을 구분하게 해 준다. 개별 툴 호출을 볼 수 있는 것은 Claude Code
+   훅뿐이고, `wrap`은 대신 경과 시간을 쓴다.
+3. **종료** — 상태 파일을 세션 시작 시점의 해시와 비교한다. 실제로 작업을 했는데 그대로면 알림이 뜨고,
+   설정에 따라서는 차단된다.
 
-HQ는 사용자가 정한 폴더 안의 순수 마크다운이다. git 저장소든, 동기화 드라이브든, 노트 볼트든,
-다른 세션들에게 파일이 전달되기만 하면 된다.
+**어떤 어댑터도 상태 내용을 대신 써 주지 않는다.** 파일을 만들고, 읽고, 물어볼 뿐이다. 내용은 실제로
+그 작업을 한 세션에서 나온다. 자동 생성된 항목은 그럴듯하게 들리는 항목일 뿐이고, 그런 항목 하나면
+파일 전체가 신뢰를 잃는다.
 
 ## 주기 설정
 
@@ -174,6 +238,10 @@ HQ 루트의 `hq.config.json`이다.
   다른 사람의 오전을 통째로 날리는 공유 저장소에 적합하다. Stop 훅의 차단 결정을 사용하며, 실제로 그만큼
   성가시게 느껴진다.
 
+**컨텍스트 창이 작은 로컬 모델을 쓴다면** 중요한 손잡이는 `inject.maxLines`다. 기본값 60은 컨텍스트가 큰
+호스팅 모델에 맞춰진 값이고, 8k 창이라면 15~25 정도가 정작 작업에 쓸 예산을 잡아먹지 않으면서 인수인계를
+쓸모 있게 유지한다. 상태 파일 자체를 짧게 유지하는 것이 나머지 절반이며, 이는 어차피 해 둘 만한 일이다.
+
 전체 레퍼런스: [docs/config.md](docs/config.md).
 
 ## 스킬로 제공되는 두 가지 관행
@@ -183,7 +251,7 @@ HQ 루트의 `hq.config.json`이다.
 **[layered-memory](skills/layered-memory/SKILL.md)** — `MEMORY.md` → `index-<domain>.md` → 파일 하나당
 사실 하나. 세션은 자기 작업에 해당하는 인덱스만 읽고 나머지는 읽지 않으므로, 기억의 비용이 전체 분량이
 아니라 관련성에 비례하게 된다. 프론트매터 스키마, 분류 우선 규칙, 6주 뒤에도 그 지시가 무시되지 않게
-하는 Why / How-to-apply 형식을 포함한다. 기존 디렉터리 점검은 `/memory-lint`로 한다.
+하는 Why / How-to-apply 형식을 포함한다. 점검은 `node scripts/hq.mjs memory-lint`(또는 `/memory-lint`).
 
 **[orchestrator-routing](skills/orchestrator-routing/SKILL.md)** — 코디네이터가 지시서를 쓰고 결과를
 검토하며, 구현과 리서치는 다른 계층에 위임하는 구조. 지시서 템플릿과 "보여주기 전 검토" 체크리스트를
@@ -192,36 +260,25 @@ HQ 루트의 `hq.config.json`이다.
 **[hq-protocol](skills/hq-protocol/SKILL.md)** 이 세 번째다. 언제 읽고 언제 쓰는지, 제대로 된 상태 항목에
 무엇이 들어가는지, 오래된 파일과 충돌하는 항목을 어떻게 다루는지를 다룬다.
 
-## Claude Code 기본 기능과의 관계
+셋 다 Claude Code 플러그인이 자동으로 띄울 수 있도록 스킬 형식으로 포장했을 뿐, 본문은 Claude에 종속된
+내용이 없는 순수 마크다운 한 장이다. 다른 에이전트에게 그 파일을 그대로 가리키거나 시스템 프롬프트에
+붙여 넣어도 된다.
 
-과장 없이 정리하면 이렇다.
+## Claude Code를 쓴다면
+
+기본 기능들과 어떻게 나란히 놓이는지, 과장 없이 정리하면 이렇다.
 
 | | 범위 | 수명 |
 |---|---|---|
-| **세션 간 메시징** (기본 기능) | 지금 동시에 돌고 있는 세션들 사이 | 실시간, 휘발성 — 세션이 끝나면 사라짐 |
-| **session-hq** | 며칠에 걸친 세션들 사이 | 영속적, 비동기 — 작성한 세션보다 오래 남음 |
+| **세션 간 메시징** (기본 기능) | 지금 동시에 돌고 있는 세션들 사이 | 실시간, 휘발성 |
+| **session-hq** | 며칠에 걸친 세션들 사이 | 영속적, 비동기 |
 | **자동 메모리** (기본 기능) | 한 프로젝트에 대한 사실 | 프로젝트 단위 |
 | **session-hq** | 여러 프로젝트에 걸친 현재 상태 | HQ 하나, 도메인 여럿 |
 
 경쟁 관계가 아니라 보완 관계다. 기본 메시징은 옆 세션에게 지금 당장 물어보는 수단이고, session-hq는
 그 세션이 지난주에 무엇을 결론지었는지 알아내는 수단이다. 자동 메모리는 *이 저장소*가 어떻게 돌아가는지를
 기억하고, HQ는 모든 저장소를 통틀어 지금 무슨 일이 벌어지고 있는지를 기억한다. 프로젝트 하나에서 세션
-하나만 돌린다면 이 플러그인은 아마 필요하지 않다.
-
-## Claude Code 없이 프로토콜만 쓰기
-
-HQ는 순수 마크다운이고, `scripts/hq.mjs`는 Claude Code에 의존하지 않는 독립 실행형 Node CLI다.
-설정은 디스크에서, 훅 페이로드는 stdin에서 읽는다. 다른 에이전트든 사람이든 직접 실행할 수 있다.
-
-```bash
-node scripts/hq.mjs inject --print --domain apps   # 세션 시작 시
-node scripts/hq.mjs inbox "아이디어 한 줄"           # 그 외: decide, update-check, doctor
-```
-
-셸 별칭, 래퍼 스크립트, 또는 쓰는 에이전트의 지시 파일(`AGENTS.md`, `GEMINI.md`, `.cursorrules`)에
-연결하면 된다. Claude Code가 추가로 제공하는 것은 자동화다. 세션 시작 시 주입하고 종료 시 검사하는
-훅이 있어서 아무도 기억할 필요가 없다. 다른 에이전트용 어댑터 기여를 환영한다 —
-[CONTRIBUTING.md](CONTRIBUTING.md) 참고.
+하나만 돌린다면 아마 필요하지 않다.
 
 ## 하지 않는 것
 
@@ -229,12 +286,13 @@ node scripts/hq.mjs inbox "아이디어 한 줄"           # 그 외: decide, up
   우회하는 기능은 없고, 추가 요청도 받지 않는다.
 - **API 프록시, 트래픽 수준의 모델 라우팅, 요청 가로채기 없음.** (`orchestrator-routing` 스킬은
   위임할 때 어느 계층에 맡길지 고르는 프롬프트 수준의 관행이지, 네트워크 계층이 아니다.)
-- **의존성 없음.** Claude Code가 이미 요구하는 Node 외에는 아무것도 필요 없다. 네이티브 모듈도,
-  설치 단계도, 데몬도 없다.
-- **자동 작성 없음.** 플러그인은 알릴 뿐, 상태 항목을 지어내지 않는다. 상태 파일은 실제로 그 작업을 한
-  사람이나 세션이 썼을 때에만 읽을 가치가 있다.
+- **의존성 없음.** Node 18 이상 외에는 아무것도 필요 없다. 네이티브 모듈도, 설치 단계도, 데몬도 없다.
+- **자동 작성 없음.** 어댑터는 알릴 뿐, 상태 항목을 지어내지 않는다.
 - **아카이브가 아니다.** HQ는 현재 상태만 담는다. 전체 대화 기록은
   [recipes/conversation-archiver.md](recipes/conversation-archiver.md)를 참고할 것.
+- **다른 도구의 내부에 대해 주장하지 않는다.** `wrap`과 지시 파일 방식은 명령을 실행하고 정중히
+  부탁하는 방식으로 동작한다. 다른 도구에 자체 훅 시스템이 있다면 그것을 이용한 어댑터 기여를
+  환영한다 — [CONTRIBUTING.md](CONTRIBUTING.md) 참고.
 
 ## 레시피
 
@@ -243,13 +301,14 @@ HQ와 잘 어울리는 패턴들이다. 남의 인프라를 그대로 물려받�
 
 - [notifier-telegram.md](recipes/notifier-telegram.md) — 상태 변화를 채팅으로 푸시
 - [deadline-reminder.md](recipes/deadline-reminder.md) — Windows·macOS·Linux 예약 리마인더
-- [conversation-archiver.md](recipes/conversation-archiver.md) — Stop 훅으로 마크다운 볼트에 보관
+- [conversation-archiver.md](recipes/conversation-archiver.md) — 대화 기록 아카이브
 - [screen-look.md](recipes/screen-look.md) — 세션이 화면을 볼 수 있게 하기
 
 ## 문서
 
+- [docs/adapters.md](docs/adapters.md) — 어댑터 세 종류, 각각이 보장하는 것, 새로 만드는 법
 - [docs/design.md](docs/design.md) — 문제 정의, 아키텍처, 설계상의 트레이드오프
-- [docs/config.md](docs/config.md) — 모든 설정 키
+- [docs/config.md](docs/config.md) — 모든 설정 키와 `wrap` 레퍼런스
 - [docs/case-studies.md](docs/case-studies.md) — 이것이 없을 때 무엇이 잘못되는지에 대한 사례 세 편
 
 ## 기여
