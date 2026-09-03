@@ -97,8 +97,11 @@ export function scanTree({ dir, denylistPath }) {
   const entries = parseDenylist(fs.readFileSync(denylistPath, 'utf8'));
   const results = [];
   let scanned = 0;
+  // A denylist living inside the scanned tree would match every one of its own terms.
+  const denylistResolved = path.resolve(denylistPath);
 
   for (const file of listFiles(dir)) {
+    if (path.resolve(file) === denylistResolved) continue;
     if (BINARY_EXT.has(path.extname(file).toLowerCase())) continue;
     let text;
     try {

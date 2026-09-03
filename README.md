@@ -7,6 +7,7 @@ session reads at start and updates at end, plus an ideas inbox and a decision lo
 hooks, at a cadence you choose.
 
 [English](README.md) · [한국어](README.ko.md)
+[![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
 
 ---
 
@@ -209,6 +210,22 @@ They compose rather than compete. Native messaging is how you ask the session ne
 question right now; session-hq is how you find out what it concluded last Tuesday. Auto-memory
 remembers how *this repo* works; the HQ remembers what is currently happening across all of them.
 If you only ever run one session on one project, you probably do not need this plugin.
+
+## Using the protocol without Claude Code
+
+The HQ is plain markdown, and `scripts/hq.mjs` is a standalone Node CLI with no dependency on
+Claude Code — it reads config from disk and hook payloads from stdin. Any agent, or a person, can
+run the protocol by hand:
+
+```bash
+node scripts/hq.mjs inject --print --domain apps   # at session start
+node scripts/hq.mjs inbox "an idea"                # also: decide, update-check, doctor
+```
+
+Wire that into a shell alias, a wrapper script, or your agent's instruction file (`AGENTS.md`,
+`GEMINI.md`, `.cursorrules`). What Claude Code adds is the automatic part: hooks that inject at
+session start and check at stop, so nobody has to remember. Adapters welcome — see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Non-goals
 

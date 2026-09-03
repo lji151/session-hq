@@ -1,0 +1,31 @@
+name: tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    name: node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [18, 22]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      # No install step: the plugin has no dependencies, which is a constraint
+      # worth catching in CI if it ever stops being true.
+      - name: Run tests
+        run: node --test
+
+      # Uses the generic example denylist. The real one lives outside the repo.
+      - name: Leak check
+        run: node scripts/leak-check.mjs --denylist .github/leak-denylist.example.txt

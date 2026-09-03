@@ -61,8 +61,9 @@ strings that must never appear inside the repo, so committing it would defeat th
 your own, one term or regex per line; blank lines and `#` comments are ignored, and an entry that
 is not valid regex syntax is matched literally.
 
-If you have no local denylist, at minimum grep your diff for your own username and home directory
-before pushing.
+CI runs the same check against `.github/leak-denylist.example.txt`, which holds only generic
+credential-shaped patterns. It is a floor, not a substitute for your own list. If you have no
+local denylist, at minimum grep your diff for your own username and home directory before pushing.
 
 ## Code
 

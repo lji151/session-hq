@@ -1,0 +1,15 @@
+# Example denylist for CI. Generic patterns only.
+#
+# This file is scanned by nothing: leak-check skips the denylist it was handed.
+# Keep your REAL denylist outside the repository — it holds exactly the strings
+# that must never appear inside it, so committing it defeats the purpose.
+#
+# One term or regex per line. Blank lines and # comments are ignored. An entry
+# that is not valid regex syntax is matched literally. Matching is case-insensitive.
+
+TODO-REMOVE-ME
+[0-9]{8,10}:[A-Za-z0-9_-]{30,}
+(sk|pk)-[A-Za-z0-9_-]{20,}
+xox[baprs]-[A-Za-z0-9-]{10,}
+AKIA[0-9A-Z]{16}
+-----BEGIN [A-Z ]*PRIVATE KEY-----

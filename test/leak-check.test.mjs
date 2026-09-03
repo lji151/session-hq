@@ -98,6 +98,19 @@ describe('scanTree', () => {
     }
   });
 
+  test('skips the denylist itself when it lives inside the scanned tree', () => {
+    // CI keeps a generic example denylist in the repo; without this it would
+    // match every one of its own terms and fail the build.
+    const dir = tmpTree({ 'a.md': 'clean\n', 'ci/denylist.txt': 'AcmeCorp\nZZ-SENTINEL\n' });
+    try {
+      const res = scanTree({ dir, denylistPath: path.join(dir, 'ci', 'denylist.txt') });
+      assert.equal(res.hits.length, 0);
+      assert.ok(!res.hits.some((h) => h.file.includes('denylist')));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   test('throws a typed error when the denylist is missing', () => {
     const dir = tmpTree({ 'a.md': 'x\n' });
     try {

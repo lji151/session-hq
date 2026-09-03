@@ -7,6 +7,7 @@ session-hq는 그 세션들에게 파일 기반의 공유 본부(HQ)를 제공�
 전 과정은 훅으로 강제되고 그 주기는 사용자가 정한다.
 
 [English](README.md) · [한국어](README.ko.md)
+[![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
 
 ---
 
@@ -206,6 +207,21 @@ HQ 루트의 `hq.config.json`이다.
 그 세션이 지난주에 무엇을 결론지었는지 알아내는 수단이다. 자동 메모리는 *이 저장소*가 어떻게 돌아가는지를
 기억하고, HQ는 모든 저장소를 통틀어 지금 무슨 일이 벌어지고 있는지를 기억한다. 프로젝트 하나에서 세션
 하나만 돌린다면 이 플러그인은 아마 필요하지 않다.
+
+## Claude Code 없이 프로토콜만 쓰기
+
+HQ는 순수 마크다운이고, `scripts/hq.mjs`는 Claude Code에 의존하지 않는 독립 실행형 Node CLI다.
+설정은 디스크에서, 훅 페이로드는 stdin에서 읽는다. 다른 에이전트든 사람이든 직접 실행할 수 있다.
+
+```bash
+node scripts/hq.mjs inject --print --domain apps   # 세션 시작 시
+node scripts/hq.mjs inbox "아이디어 한 줄"           # 그 외: decide, update-check, doctor
+```
+
+셸 별칭, 래퍼 스크립트, 또는 쓰는 에이전트의 지시 파일(`AGENTS.md`, `GEMINI.md`, `.cursorrules`)에
+연결하면 된다. Claude Code가 추가로 제공하는 것은 자동화다. 세션 시작 시 주입하고 종료 시 검사하는
+훅이 있어서 아무도 기억할 필요가 없다. 다른 에이전트용 어댑터 기여를 환영한다 —
+[CONTRIBUTING.md](CONTRIBUTING.md) 참고.
 
 ## 하지 않는 것
 
