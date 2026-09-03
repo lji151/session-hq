@@ -332,8 +332,11 @@ describe('wrap (the generic adapter)', () => {
       .filter((f) => f.startsWith('wrap-'))
       .map((f) => JSON.parse(fs.readFileSync(path.join(ROOT, '.state', f), 'utf8')));
     assert.ok(states.length > 0, 'a wrapped run must leave state behind');
-    assert.equal(states[0].domain, 'apps');
-    assert.equal(typeof states[0].statusHashAtStart, 'string');
+    // Other wrap tests leave their own state files, and readdir order is not defined,
+    // so look for the one this test created rather than trusting position.
+    const mine = states.filter((s) => s.domain === 'apps');
+    assert.ok(mine.length > 0, 'the apps run must be among them');
+    assert.equal(typeof mine[0].statusHashAtStart, 'string');
   });
 
   test('runs a Windows .cmd shim through the shell fallback', { skip: process.platform !== 'win32' }, () => {
