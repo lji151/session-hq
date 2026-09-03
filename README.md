@@ -334,6 +334,37 @@ A department session sees its open dispatches at the top of its own injection, b
 file, and closes one with `hq.mjs done <id> --note "<result>"`. The orchestrator's queue is the
 **Awaiting review** list on the dashboard.
 
+### Use it your way
+
+None of the above is a prescribed workflow. The only fixed part is the status-file format; how you
+cut sessions and how you consume the HQ are dials. Six shapes people actually run:
+
+**Solo, just visibility.** One session per project, `update.mode: "on-stop"`, no orchestrator. Run
+`hq.mjs dashboard` when you want the picture. This is the default install and it is enough for most
+people.
+
+**Orchestrator-led.** One coordinating session with `HQ_DOMAIN=hq`, the whole HQ injected, using
+`dispatch` / `done` / `ack`. Department sessions get closed and reopened freely — the record is on
+disk, so nothing is lost when one goes away.
+
+**Strict handoffs (team).** `update.enforce: true` so a session cannot end without writing back, the
+HQ folder in a shared git repo, and `decisions.md` as the team's decision log. Reviewable in pull
+requests like anything else.
+
+**Coaching a new habit.** `update.mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20`
+while the habit forms; switch back to `on-stop` once nobody needs the reminder.
+
+**Mixed agents and local models.** Claude Code through the plugin's hooks, everything else through
+`hq.mjs wrap` or an instruction file — one HQ for all of them. On a small context window, lower
+`inject.maxLines` (15–25 on an 8k window) and, for the orchestrator seat,
+`orchestrator.injectDashboard: false`.
+
+**Cut by whatever you like.** Domains can be projects, clients, life areas, or a single `work`.
+Rename by editing `domains` in `hq.config.json` and renaming the matching `status-<domain>.md`;
+nothing else in the system cares what they mean.
+
+Start with the first one. Add dials when a missed handoff makes you want one, not before.
+
 ## Configure the cadence
 
 Nagging that does not fit how you work gets turned off, and then the whole thing rots. So the

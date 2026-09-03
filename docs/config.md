@@ -213,6 +213,38 @@ Language hint for generated templates and prose. It does not change the CLI's ow
 
 ---
 
+## Profiles
+
+Nothing here is a prescribed workflow. The status-file format is the only fixed part; everything
+else is a dial. These are shapes people run, with the exact settings that produce them.
+
+| Profile | Config | Commands you use |
+|---|---|---|
+| **Solo, just visibility** | `update.mode: "on-stop"`, `update.enforce: false`, no `HQ_DOMAIN=hq` session | `dashboard` when you want it |
+| **Orchestrator-led** | defaults, plus one session with `HQ_DOMAIN=hq` | `dispatch`, `done`, `ack`, `dashboard` |
+| **Strict handoffs (team)** | `update.enforce: true`, `hqRoot` inside a shared git repo | `decisions.md` as the team's decision log |
+| **Coaching a new habit** | `update.mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20` | relax to `on-stop` once it sticks |
+| **Mixed agents** | defaults; Claude Code via hooks, others via `wrap` or an instruction file | `wrap --domain <d> -- <agent>` |
+| **Small-context local model** | `inject.maxLines: 20`, `orchestrator.injectDashboard: false` | same as any other profile |
+
+Notes on the ones with a trap in them:
+
+- **Strict handoffs.** `enforce: true` uses the Stop hook's blocking decision, so it only exists
+  under Claude Code — `wrap` regains control after the agent has already exited and cannot refuse
+  anything. Mixed-agent teams should treat it as a nudge for some members and a wall for others.
+- **Team HQ in git.** Add `.state/` to that repo's `.gitignore`; it is per-machine bookkeeping and
+  will conflict on every pull. The shipped `.gitignore` already does this.
+- **Small-context models.** `inject.maxLines` is the knob that matters, and short status files are
+  the other half. A 400-line status file is a problem for every profile; it is only *fatal* here.
+- **Renaming domains.** Edit `domains` in `hq.config.json` and rename the matching
+  `status-<domain>.md`. Nothing else stores the domain name except `.state/` (disposable) and the
+  `to`/`from` fields of past dispatches, which are history and should not be rewritten.
+
+Domains can be projects, clients, life areas, or a single `work`. The system has no opinion about
+what they mean — only that a session belongs to one.
+
+Start at the first row. Add dials when a missed handoff makes you want one.
+
 ## Dispatches
 
 `<hqRoot>/dispatches.md` is work handed from one seat to a department, and the result handed back.
