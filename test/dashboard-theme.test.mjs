@@ -1,4 +1,4 @@
-// "Make the dashboard yours": the presets, the knobs and the labels.
+// "Make the dashboard yours": presets, knobs, labels, and the two Tier-3 files.
 import { test, describe, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -45,6 +45,12 @@ function page(extraArgs = []) {
   fs.rmSync(out, { force: true });
   return html;
 }
+const rmCustom = () => {
+  for (const f of ['dashboard.css', 'dashboard.template.html']) {
+    fs.rmSync(path.join(ROOT, f), { force: true });
+  }
+};
+
 before(() => {
   ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'session-hq-theme-'));
   hq(['init', '--root', ROOT, '--domains', 'video,apps,business', '--yes']);
@@ -210,5 +216,71 @@ describe('tier 2: labels', () => {
     assert.match(html, /<h2>Gone quiet \(over 48h\)/);
     assert.match(html, /<h2>Stuck<\/h2>/);
     assert.match(html, /<h2>Awaiting review<\/h2>/, 'the other eighty labels are still English');
+  });
+});
+
+describe('tier 3: your own CSS and your own template', () => {
+  after(() => { rmCustom(); setDashboard(null); });
+
+  test('dashboard.css is inlined after the theme, so it wins', () => {
+    rmCustom();
+    fs.writeFileSync(path.join(ROOT, 'dashboard.css'),
+      ':root { --bg: #123456; }\nbody { letter-spacing: .5px; }\n', 'utf8');
+    const html = page(['--theme', 'paper']);
+    const themeAt = html.indexOf('theme: paper');
+    const mineAt = html.indexOf('--bg: #123456;');
+    assert.ok(themeAt !== -1 && mineAt !== -1, 'both stylesheets are on the page');
+    assert.ok(themeAt < mineAt, 'the user file comes last, so it overrides the theme');
+    assert.ok(html.includes(`--bg: ${THEMES.paper.vars.bg};`), 'the theme value is still there, just overridden');
+    assert.match(html, /letter-spacing: \.5px;/);
+    rmCustom();
+  });
+
+  test('a custom template with only some slots renders, and unknown slots render empty', () => {
+    rmCustom();
+    fs.writeFileSync(path.join(ROOT, 'dashboard.template.html'),
+      '<!doctype html>\n<html lang="{{lang}}"><head><title>{{title}}</title>{{meta}}' +
+      '<style>{{css}}</style></head><body>{{header}}{{stale}}{{nonsense}}</body></html>\n', 'utf8');
+    const html = page();
+    assert.match(html, /<h2>Stale \(over 48h\)/, 'the slots it does use are filled');
+    assert.ok(!/\{\{/.test(html), 'no placeholder survives, known or not');
+    assert.ok(!/<h2>Blocked/.test(html), 'slots the template omits simply do not appear');
+    assert.match(html, /--bg: /, 'the theme still reaches the page through {{css}}');
+    rmCustom();
+  });
+
+  test('--watch still refreshes a custom template that has no {{meta}} slot', () => {
+    rmCustom();
+    fs.writeFileSync(path.join(ROOT, 'dashboard.template.html'),
+      '<!doctype html>\n<html><head><title>{{title}}</title></head><body>{{stale}}</body></html>\n', 'utf8');
+    const { code } = hq(['dashboard', '--no-open', '--watch', '1', '--watch-iterations', '1']);
+    assert.equal(code, 0);
+    const html = fs.readFileSync(path.join(ROOT, 'dashboard.html'), 'utf8');
+    assert.match(html, /<meta http-equiv="refresh" content="1">/, 'the refresh tag is injected into the head');
+    assert.ok(html.indexOf('http-equiv="refresh"') < html.indexOf('<body>'), 'and lands in the head, not the body');
+    rmCustom();
+  });
+
+  test('--eject writes both files, and a second --eject refuses to overwrite them', () => {
+    rmCustom();
+    const tpl = path.join(ROOT, 'dashboard.template.html');
+    const css = path.join(ROOT, 'dashboard.css');
+
+    const first = hq(['dashboard', '--no-open', '--eject', '--theme', 'terminal']);
+    assert.equal(first.code, 0);
+    assert.match(first.stdout, /created {2}dashboard\.template\.html/);
+    assert.match(first.stdout, /created {2}dashboard\.css/);
+    assert.match(fs.readFileSync(tpl, 'utf8'), /\{\{header\}\}/, 'the ejected template is the real one');
+    assert.match(fs.readFileSync(css, 'utf8'), /theme: terminal/, 'the ejected CSS is the theme that was asked for');
+
+    fs.writeFileSync(tpl, 'MINE\n', 'utf8');
+    fs.writeFileSync(css, '/* MINE */\n', 'utf8');
+    const second = hq(['dashboard', '--no-open', '--eject']);
+    assert.equal(second.code, 0);
+    assert.match(second.stdout, /kept {5}dashboard\.template\.html/);
+    assert.match(second.stdout, /kept {5}dashboard\.css/);
+    assert.equal(fs.readFileSync(tpl, 'utf8'), 'MINE\n', 'an existing template is never overwritten');
+    assert.equal(fs.readFileSync(css, 'utf8'), '/* MINE */\n', 'nor an existing stylesheet');
+    rmCustom();
   });
 });

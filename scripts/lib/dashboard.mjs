@@ -10,6 +10,10 @@ import { LABELS_EN, resolveLabels, fmt } from './labels.mjs';
 import { buildCss, builtinTemplate, fillTemplate, THEMES, THEME_NAMES,
          DENSITIES, DENSITY_NAMES, SECTION_NAMES, DEFAULT_SECTIONS } from './theme.mjs';
 
+/** Tier 3: files a user drops in the HQ root to take over the look entirely. */
+export const CSS_FILE = 'dashboard.css';
+export const TEMPLATE_FILE = 'dashboard.template.html';
+
 /* --------------------------------------------------------------- gathering */
 
 export function relTime(hours, labels = LABELS_EN) {
@@ -83,7 +87,7 @@ function lastEntries(file, n) {
  * unrecognised falls back to the default and says so on stderr rather than
  * failing — a typo in a theme name should never cost you the dashboard.
  */
-export function resolveDashboardOptions(config = {}, flags = {}, { warn = defaultWarn } = {}) {
+export function resolveDashboardOptions(config = {}, flags = {}, hqRoot = null, { warn = defaultWarn } = {}) {
   const d = config.dashboard || {};
 
   const themeAsked = flags.theme !== undefined && flags.theme !== true ? String(flags.theme) : d.theme;
@@ -102,6 +106,7 @@ export function resolveDashboardOptions(config = {}, flags = {}, { warn = defaul
   const labels = resolveLabels(labelsAsked, { language: config.language || 'en' });
 
   const sections = normaliseSections(d.sections, warn);
+  const custom = hqRoot ? loadCustomisations(hqRoot) : { css: null, template: null };
 
   return {
     theme,
@@ -112,6 +117,8 @@ export function resolveDashboardOptions(config = {}, flags = {}, { warn = defaul
     font: d.font ?? null,
     title: typeof d.title === 'string' && d.title.trim() ? d.title.trim() : labels.title,
     showHqRoot: d.showHqRoot !== false,
+    customCss: custom.css,
+    template: custom.template,
   };
 }
 function defaultWarn(message) {
@@ -133,6 +140,14 @@ function normaliseSections(sections, warn = defaultWarn) {
     out.push(name);
   }
   return out;
+}
+/** Tier 3, read fresh on every render: whatever the user left in the HQ root. */
+export function loadCustomisations(hqRoot) {
+  const read = (name) => {
+    const p = path.join(hqRoot, name);
+    try { return isFile(p) ? fs.readFileSync(p, 'utf8') : null; } catch { return null; }
+  };
+  return { css: read(CSS_FILE), template: read(TEMPLATE_FILE) };
 }
 /** True when the decisions list sits directly under the inbox section. */
 function foldsIntoInbox(sections) {
@@ -293,13 +308,15 @@ function withDefaults(opts) {
  * The domain table and the inbox/decisions counts follow, for people who want
  * the detail — and `dashboard.sections` reorders or hides any of them.
  *
- * Pass `watchSeconds` to have the page refresh itself.
+ * Pass `watchSeconds` to have the page refresh itself, `template` to render
+ * someone else's HTML file instead of the built-in one, and `customCss` to
+ * append a stylesheet after the theme's own.
  */
 export function renderHtml(d, opts = {}) {
   const { labels: L, sections, title, showHqRoot } = withDefaults(opts);
   const {
     watchSeconds = null, theme = 'auto', density = 'comfortable',
-    accent = null, font = null,
+    accent = null, font = null, customCss = null, template = null,
   } = opts;
 
   const list = (items, empty) => (items.length === 0
@@ -329,7 +346,7 @@ export function renderHtml(d, opts = {}) {
     lang: esc(L.lang || 'en'),
     title: esc(title),
     meta: watchSeconds ? `<meta http-equiv="refresh" content="${watchSeconds}">` : '',
-    css: buildCss({ theme, accent, font, density }),
+    css: [buildCss({ theme, accent, font, density }), customCss].filter(Boolean).join('\n\n'),
     header: `<h1>${esc(title)}</h1>\n  <p class="meta">${headerMeta(d, L, showHqRoot)}</p>`,
     footer: watchSeconds
       ? fmt(L.footerWatch, { s: watchSeconds, when: esc(formatGeneratedAt(d.generatedAt)) })
@@ -337,7 +354,7 @@ export function renderHtml(d, opts = {}) {
   };
   for (const name of SECTION_NAMES) slots[name] = sections.includes(name) ? build[name]() : '';
 
-  return fillTemplate(builtinTemplate(sections), slots);
+  return fillTemplate(template || builtinTemplate(sections), slots);
 }
 /** English reads better as "over 48h" than as an escaped ">"; other sets say so themselves. */
 function overWord(labels) {
@@ -410,14 +427,14 @@ function runPageDashboard({ config, hqRoot, staleAfterHours, flags }) {
   }
 
   // Once, loudly, so a mistyped theme is reported exactly one time per run.
-  const look = resolveDashboardOptions(config, flags);
+  const first = resolveDashboardOptions(config, flags, hqRoot);
   const render = (opts) => {
     const data = collectDashboard(config, hqRoot, staleAfterHours);
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, renderHtml(data, { ...opts, watchSeconds }), 'utf8');
   };
 
-  render(look);
+  render(first);
   if (!flags['no-open']) openInDefaultBrowser(outPath);
   console.log(oneLiner(outPath, watchSeconds));
 
@@ -430,12 +447,39 @@ function runPageDashboard({ config, hqRoot, staleAfterHours, flags }) {
   return new Promise((resolve) => {
     const stop = () => { clearInterval(timer); process.off('SIGINT', stop); resolve(); };
     const timer = setInterval(() => {
-      render(look);
+      // Re-resolve quietly: editing dashboard.css or the template shows up next tick.
+      render(resolveDashboardOptions(config, flags, hqRoot, { warn: () => {} }));
       count++;
       if (maxIterations !== null && count >= maxIterations) stop();
     }, watchSeconds * 1000);
     process.on('SIGINT', stop);
   });
+}
+
+/* ------------------------------------------------------------------ eject */
+
+/**
+ * Hand over the real thing: the template this run would have used, and the CSS
+ * this run's theme produces. Never overwrites — an existing file is the user's
+ * own work, and losing it to a stray `--eject` would be unforgivable.
+ */
+export function cmdEject(hqRoot, opts) {
+  const files = [
+    [TEMPLATE_FILE, builtinTemplate(opts.sections)],
+    [CSS_FILE, `${buildCss(opts)}\n`],
+  ];
+  for (const [name, contents] of files) {
+    const out = path.join(hqRoot, name);
+    if (isFile(out)) {
+      console.log(`  kept     ${name} (already exists; delete it to eject a fresh copy)`);
+      continue;
+    }
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, contents, 'utf8');
+    console.log(`  created  ${name}`);
+  }
+  console.log('');
+  console.log(`Both are read from ${hqRoot} on the next \`hq dashboard\`. Delete either one to go back.`);
 }
 
 /* ----------------------------------------------------------------- command */
@@ -457,7 +501,9 @@ export function cmdDashboard(flags) {
     return;
   }
 
-  const opts = resolveDashboardOptions(config, flags);
+  if (flags.eject) return cmdEject(hqRoot, resolveDashboardOptions(config, flags, hqRoot));
+
+  const opts = resolveDashboardOptions(config, flags, hqRoot);
   if (flags.terminal) {
     console.log(renderTerminal(collectDashboard(config, hqRoot, staleAfterHours), opts));
     return;

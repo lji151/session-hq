@@ -140,7 +140,7 @@ export async function cmdInit(flags) {
     const onDisk = deepMerge(DEFAULT_CONFIG, safeReadJson(cfgPath));
     const dashOut = path.join(root, 'dashboard.html');
     const data = collectDashboard(onDisk, root, onDisk.inject.staleAfterHours);
-    const look = resolveDashboardOptions(onDisk, {}, { warn: () => {} });
+    const look = resolveDashboardOptions(onDisk, {}, root, { warn: () => {} });
     fs.writeFileSync(dashOut, renderHtml(data, look), 'utf8');
     console.log('');
     console.log(`dashboard written to ${dashOut}`);

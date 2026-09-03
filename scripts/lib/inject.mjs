@@ -155,7 +155,7 @@ export function buildOrchestratorContext({ config, hqRoot, domain, adapter = 'ho
 
   if (config.orchestrator?.injectDashboard !== false) {
     const data = collectDashboard(config, hqRoot, config.inject.staleAfterHours);
-    const look = resolveDashboardOptions(config, {}, { warn: () => {} });
+    const look = resolveDashboardOptions(config, {}, hqRoot, { warn: () => {} });
     out.push(trimToLines(renderMarkdown(data, look), maxLines));
     out.push('');
   }

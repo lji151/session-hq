@@ -17,7 +17,7 @@
  *   node hq.mjs dispatches    [--domain d] [--open|--awaiting-review|--all]
  *   node hq.mjs dashboard     [--watch [seconds]] [--no-open] [--terminal | --md | --html <file>]
  *                             [--theme auto|paper|terminal|slate] [--density comfortable|compact]
- *                             [--labels en|ko]
+ *                             [--labels en|ko] [--eject]
  *   node hq.mjs doctor        [--json]
  *   node hq.mjs memory-lint   [--dir <dir>] [--json]
  *   node hq.mjs leak-check    [--denylist <file>] [--dir <dir>]
@@ -42,9 +42,9 @@ export { DEFAULT_CONFIG, CONFIG_NAME, discoverConfig, validateConfig, statusPath
          resolveDomain, accountableDomain, isOrchestratorDomain } from './lib/config.mjs';
 export { expandHome, safeSlug } from './lib/util.mjs';
 export { collectDashboard, renderHtml, renderMarkdown, renderTerminal,
-         resolveDashboardOptions } from './lib/dashboard.mjs';
-export { THEMES, THEME_NAMES, DENSITIES, DENSITY_NAMES, SECTION_NAMES,
-         DEFAULT_SECTIONS, buildCss } from './lib/theme.mjs';
+         resolveDashboardOptions, loadCustomisations } from './lib/dashboard.mjs';
+export { THEMES, THEME_NAMES, DENSITIES, DENSITY_NAMES, SECTION_NAMES, DEFAULT_SECTIONS,
+         buildCss, builtinTemplate, fillTemplate, TEMPLATE_SLOTS } from './lib/theme.mjs';
 export { LABEL_SETS, LABEL_SET_NAMES, LABELS_EN, LABELS_KO, resolveLabels } from './lib/labels.mjs';
 export { lastUpdatedAt, hashFile, parseStatusFile, summariseDomain } from './lib/status.mjs';
 export { dispatchPath, parseDispatches, readDispatches, openDispatchesFor,
@@ -79,6 +79,7 @@ const USAGE = `session-hq
   hq.mjs dashboard     [--watch [seconds]] [--no-open] [--terminal | --md]   one page, opened for you
                        [--theme auto|paper|terminal|slate] [--density comfortable|compact]
                        [--labels en|ko]                    pick a look for this run
+                       [--eject]                           write the template and CSS to the HQ root
   hq.mjs doctor        [--json]
   hq.mjs memory-lint   [--dir <dir>] [--json]
   hq.mjs leak-check    [--denylist <file>] [--dir <dir>]
