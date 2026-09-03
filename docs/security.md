@@ -19,6 +19,10 @@ untrusted string as the command — do not.
 **`leak-check` shells out once**, to `git ls-files`, to enumerate tracked files. It falls back to a
 filtered directory walk when that fails.
 
+**`dashboard`, with no view flag, opens your default browser** on the page it just wrote — `cmd /c
+start` on Windows, `open` on macOS, `xdg-open` on Linux — spawned detached and never waited on.
+`--no-open` skips it; nothing else about the command changes.
+
 Verify the whole surface:
 
 ```bash
@@ -60,8 +64,8 @@ are meant to be shareable, greppable and, often, committed.
 
 - Reads four environment variables, all its own: `HQ_ROOT`, `HQ_DOMAIN`, `HQ_MEMORY_DIR`,
   `CLAUDE_PLUGIN_ROOT`. (`grep -roE "env\.[A-Z_]+" scripts/`)
-- Writes only inside the HQ root, plus whatever path you pass to `dashboard --html`.
-  (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
+- Writes only inside the HQ root — including the `dashboard.html` it writes there by default —
+  plus whatever path you pass to `dashboard --html`. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
 - Domain names reach the filesystem, so they are slugified to `[a-z0-9._-]` with leading dots and
   dashes stripped. `HQ_DOMAIN` cannot walk out of the HQ root. There is a test for this.
 - `memory-lint` reads a directory you name and writes nothing.

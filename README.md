@@ -6,7 +6,7 @@ session-hq is a shared, file-based headquarters for AI coding-agent sessions —
 Gemini CLI, Cursor, aider, or a local model in a shell — one markdown status file per domain, read
 at session start, written at session end.
 
-**Status: 0.1 — early, used daily by the author, APIs may move.**
+**Status: 0.2 — early, used daily by the author, APIs may move.**
 
 <details>
 <summary><b>At a glance</b> — every line below is checkable from this repo</summary>
@@ -19,11 +19,12 @@ at session start, written at session end.
   `CLAUDE_PLUGIN_ROOT`. It reads no credentials and no other configuration.
   (`grep -roE "env\.[A-Z_]+" scripts/`)
 - **Writes only inside the HQ root:** `hq.config.json`, `status-<domain>.md`, `ideas-inbox.md`,
-  `decisions.md`, `dispatches.md`, `.state/<session-id>.json` — plus the file you name with
-  `dashboard --html`. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
-- **Runs one external process, only when asked:** the command you put after `--` in `wrap`.
-  (`leak-check` also calls `git ls-files`.)
-- **93 tests**, no network and no committed fixtures: `node --test`.
+  `decisions.md`, `dispatches.md`, `.state/<session-id>.json`, `dashboard.html` — plus the file
+  you name with `dashboard --html`. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
+- **Runs external processes only when asked:** the command you put after `--` in `wrap`;
+  `dashboard` opens your default browser unless you pass `--no-open`. (`leak-check` also calls
+  `git ls-files`.)
+- **106 tests**, no network and no committed fixtures: `node --test`.
 - **CI:** ubuntu, macos and windows on Node 18 and 22 — `.github/workflows/test.yml`.
 - **Verified by hand on Windows 11** (Claude Code 2.1.x, live install and hook run) **and on Linux**
   (WSL Ubuntu, Node 22: full suite, `init`, `wrap` exit-code propagation, `dashboard`). macOS is
@@ -156,56 +157,27 @@ synced drive, a notes vault. Nothing here needs a database, a daemon, or a netwo
 
 ## Quick start
 
-### Claude Code (automatic)
-
-Hooks read and check the file for you. Requires Node ≥ 18, which Claude Code already needs.
+### Claude Code
 
 ```bash
 claude plugin marketplace add lji151/session-hq
 claude plugin install session-hq@session-hq
 ```
 
-Then `/hq-init` in Claude Code, and **restart** — hooks load at session start, so the session that
-ran it is still running without them. Give each session a domain with `HQ_DOMAIN`, or set
-`defaultDomain` for a machine that mostly does one thing. Check with `/hq-doctor`.
+`/hq-init` — answers three questions, then restart Claude Code — then `/hq-dashboard`.
 
-### Any other agent (generic)
-
-Clone the repo, create the HQ, and wrap your agent. No plugin, no hooks.
+### Any other agent
 
 ```bash
 git clone https://github.com/lji151/session-hq
-node session-hq/scripts/hq.mjs init --domains video,apps,business
+node session-hq/scripts/hq.mjs init
+node session-hq/scripts/hq.mjs wrap --domain <d> -- <agent>
+node session-hq/scripts/hq.mjs dashboard
 ```
 
-`wrap` prints the domain's status before your agent starts, then checks on the way out whether
-anything was written back. Everything after `--` is your command, passed through untouched, and
-its exit code is propagated:
-
-```bash
-node scripts/hq.mjs wrap --domain video  -- codex
-node scripts/hq.mjs wrap --domain apps   -- aider --model <your-model> src/
-node scripts/hq.mjs wrap --domain apps   -- my-local-agent --serve
-```
-
-Make it an alias so nobody has to remember:
-
-```bash
-alias agent='node ~/session-hq/scripts/hq.mjs wrap --domain apps -- my-local-agent'
-```
-
-**Or point the agent at the protocol itself.** Paste three lines into its instruction file —
-`AGENTS.md`, `GEMINI.md`, `.cursorrules`, a system prompt, whatever your tool reads:
-
-```markdown
-At the start of a session, run: node ~/session-hq/scripts/hq.mjs inject --print --domain apps
-Record ideas with `hq.mjs inbox "<line>"` and decisions with `hq.mjs decide "<line>"`.
-Before finishing, update status-apps.md: Status, Next, Blocked on, Ruled out, Updated.
-```
-
-This is a **convention, not enforcement** — nothing makes the agent comply. `wrap` at least
-guarantees the read happens and the omission is noticed. See [docs/adapters.md](docs/adapters.md)
-for what each adapter actually guarantees.
+That is the whole surface most people need. `wrap`'s options, the instruction-file convention for
+tools with no CLI to wrap, and every other flag are in [docs/adapters.md](docs/adapters.md) and
+[docs/config.md](docs/config.md).
 
 ## How it works
 
@@ -260,12 +232,14 @@ entry, which is exactly what makes a file stop being trusted.
 
 ### See everything at once
 
-Five domains is past the point where you can hold the picture in your head. `dashboard` collapses
-every status file into one screen, and answers the question you actually have — *what have I
-missed* — rather than just listing what exists.
+Five domains is past the point where you can hold the picture in your head. `hq.mjs dashboard` —
+or `/hq-dashboard` — writes one page and opens it, answering the question you actually have —
+*what have I missed* — before anything else on it.
+
+<sub>The same picture as text, for a terminal or a screen reader (`dashboard --terminal`):</sub>
 
 ```console
-$ node scripts/hq.mjs dashboard
+$ node scripts/hq.mjs dashboard --terminal
 
 session-hq dashboard — ~/hq
 3 domains · stale after 48h · generated 2026-02-04 09:12 UTC
@@ -293,12 +267,12 @@ LATEST DECISIONS
   2026-01-31 | cold opens replace framing intros | video
 ```
 
-`--md` gives the same picture as markdown. `--html <file>` writes a self-contained page — inline
-CSS, no scripts, no network — to keep open on a second monitor. Under Claude Code, `/hq-dashboard`.
+No server, no port, no script on the page — just HTML that regenerates when you ask it to, or
+continuously with `--watch`. Every other view and flag is in [docs/config.md](docs/config.md#the-dashboard).
 
 ### Two ways to sit in the CEO seat
 
-**You look.** Run `hq.mjs dashboard` — or `/hq-dashboard` — whenever you want the picture. Optional,
+**You look.** Run `hq.mjs dashboard` — or `/hq-dashboard` — whenever you want the page. Optional,
 on demand, no session required.
 
 **Or an agent looks, all day.** An *orchestrator session* is one session whose domain is
@@ -367,22 +341,23 @@ file, and closes one with `hq.mjs done <id> --note "<result>"`. The orchestrator
 ### Use it your way
 
 None of the above is a prescribed workflow. The only fixed part is the status-file format; how you
-cut sessions and how you consume the HQ are dials. Six shapes people actually run:
+cut sessions and how you consume the HQ are dials, and `hq.mjs init --profile <word>` (or the third
+question it asks) sets the reminder cadence for you. Six shapes people actually run:
 
-**Solo, just visibility.** One session per project, `update.mode: "on-stop"`, no orchestrator. Run
-`hq.mjs dashboard` when you want the picture. This is the default install and it is enough for most
-people.
+**Solo, just visibility.** `--profile gentle` — one session per project, a soft reminder at session
+end, no orchestrator. Run `hq.mjs dashboard` when you want the page. This is the default install and
+it is enough for most people.
 
-**Orchestrator-led.** One coordinating session with `HQ_DOMAIN=hq`, the whole HQ injected, using
-`dispatch` / `done` / `ack`. Department sessions get closed and reopened freely — the record is on
-disk, so nothing is lost when one goes away.
+**Orchestrator-led.** `--profile orchestrator` — one coordinating session with `HQ_DOMAIN=hq`, the
+whole HQ injected, using `dispatch` / `done` / `ack`. Department sessions get closed and reopened
+freely — the record is on disk, so nothing is lost when one goes away.
 
-**Strict handoffs (team).** `update.enforce: true` so a session cannot end without writing back, the
-HQ folder in a shared git repo, and `decisions.md` as the team's decision log. Reviewable in pull
+**Strict handoffs (team).** `--profile strict` — a session cannot end without writing back. Put the
+HQ folder in a shared git repo and use `decisions.md` as the team's decision log. Reviewable in pull
 requests like anything else.
 
-**Coaching a new habit.** `update.mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20`
-while the habit forms; switch back to `on-stop` once nobody needs the reminder.
+**Coaching a new habit.** `--profile coaching` — a nudge every 40 tool calls while the habit forms;
+switch to `--profile gentle` once nobody needs the reminder.
 
 **Mixed agents and local models.** Claude Code through the plugin's hooks, everything else through
 `hq.mjs wrap` or an instruction file — one HQ for all of them. On a small context window, lower
@@ -398,7 +373,8 @@ Start with the first one. Add dials when a missed handoff makes you want one, no
 ## Configure the cadence
 
 Nagging that does not fit how you work gets turned off, and then the whole thing rots. So the
-cadence is a first-class setting. `hq.config.json` at the HQ root:
+cadence is a first-class setting — pick it with `hq.mjs init --profile gentle|coaching|strict`
+(or the third question `init` asks), or set it directly in `hq.config.json` at the HQ root:
 
 ```json
 {
@@ -424,12 +400,12 @@ cadence is a first-class setting. `hq.config.json` at the HQ root:
 | `update.enforce` | boolean | `on-stop` only. `false` (default) reminds. `true` **blocks** the stop until the file is updated. |
 | `language` | `en` · any tag | Language hint for generated templates. |
 
-Three cadences that people actually use:
+Three cadences that people actually use, each also a profile word:
 
-- **Light** — `mode: "on-stop"`, `enforce: false`. One reminder at the end, ignorable. The default.
-- **Coaching** — `mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20`. Useful while a
+- **`gentle`** — `mode: "on-stop"`, `enforce: false`. One reminder at the end, ignorable. The default.
+- **`coaching`** — `mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20`. Useful while a
   team is building the habit.
-- **Strict** — `mode: "on-stop"`, `enforce: true`. The session cannot end without writing back.
+- **`strict`** — `mode: "on-stop"`, `enforce: true`. The session cannot end without writing back.
   Appropriate for shared repos where a missed handoff costs someone else a morning. It uses the
   Stop hook's blocking decision, and it will feel like it.
 
@@ -525,7 +501,7 @@ adapt them without inheriting anyone's infrastructure:
 
 - [docs/adapters.md](docs/adapters.md) — the three adapters, what each guarantees, how to write one
 - [docs/design.md](docs/design.md) — the problem, the architecture, and the tradeoffs
-- [docs/config.md](docs/config.md) — every configuration key, and the `wrap` reference
+- [docs/config.md](docs/config.md) — every configuration key, and the `init`/`wrap`/`dashboard` reference
 - [docs/case-studies.md](docs/case-studies.md) — three stories about what goes wrong without this
 - [docs/security.md](docs/security.md) — what executes, the trust boundary, reporting
 - [llms.txt](llms.txt) — the same map in one file, for anyone (or anything) summarising the repo

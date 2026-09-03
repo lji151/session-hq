@@ -6,7 +6,7 @@ session-hq는 AI 코딩 에이전트 세션들을 위한 파일 기반 공유 �
 Gemini CLI, Cursor, aider, 혹은 셸에서 돌리는 로컬 모델까지 — 도메인마다 마크다운 상태 파일 하나를
 두고, 세션 시작 시 읽고 세션 종료 시 기록한다.
 
-**상태: 0.1 — 초기 단계. 만든 사람이 매일 쓰고 있으며, API는 바뀔 수 있다.**
+**상태: 0.2 — 초기 단계. 만든 사람이 매일 쓰고 있으며, API는 바뀔 수 있다.**
 
 <details>
 <summary><b>한눈에</b> — 아래 항목은 전부 이 저장소에서 직접 확인할 수 있다</summary>
@@ -19,11 +19,11 @@ Gemini CLI, Cursor, aider, 혹은 셸에서 돌리는 로컬 모델까지 — �
   `CLAUDE_PLUGIN_ROOT`. 자격 증명이나 다른 설정은 읽지 않는다.
   (`grep -roE "env\.[A-Z_]+" scripts/`)
 - **쓰기는 HQ 루트 안에서만:** `hq.config.json`, `status-<domain>.md`, `ideas-inbox.md`,
-  `decisions.md`, `dispatches.md`, `.state/<session-id>.json`. 그 밖에는 `dashboard --html`에
-  직접 지정한 파일뿐이다. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
-- **외부 프로세스는 요청할 때 하나만 실행한다:** `wrap`의 `--` 뒤에 쓴 명령.
-  (`leak-check`은 `git ls-files`도 부른다.)
-- **테스트 93개.** 네트워크도, 저장소에 넣어 둔 픽스처도 없다: `node --test`.
+  `decisions.md`, `dispatches.md`, `.state/<session-id>.json`, `dashboard.html`. 그 밖에는
+  `dashboard --html`에 직접 지정한 파일뿐이다. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
+- **외부 프로세스는 요청할 때만 실행한다:** `wrap`의 `--` 뒤에 쓴 명령, 그리고 `dashboard`가
+  `--no-open`을 주지 않으면 여는 기본 브라우저. (`leak-check`은 `git ls-files`도 부른다.)
+- **테스트 106개.** 네트워크도, 저장소에 넣어 둔 픽스처도 없다: `node --test`.
 - **CI:** ubuntu·macos·windows × Node 18·22 — `.github/workflows/test.yml`.
 - **Windows 11과 Linux에서 직접 검증**했다. Windows 11은 Claude Code 2.1.x로 실제 설치와 훅 실행까지,
   Linux는 WSL Ubuntu·Node 22에서 전체 테스트와 `init`, `wrap`의 종료 코드 전파, `dashboard`까지
@@ -152,55 +152,26 @@ Last updated 19h ago (from stamp).
 
 ## 빠른 시작
 
-### Claude Code (자동)
-
-훅이 읽기와 검사를 대신 해 준다. Claude Code가 이미 요구하는 Node 18 이상이면 된다.
+### Claude Code
 
 ```bash
 claude plugin marketplace add lji151/session-hq
 claude plugin install session-hq@session-hq
 ```
 
-그다음 Claude Code에서 `/hq-init`을 실행하고 **재시작**한다. 훅은 세션 시작 시점에 로드되므로 방금
-실행한 세션은 아직 훅 없이 돌아가고 있다. 세션별 도메인은 `HQ_DOMAIN`으로 지정하고, 한 종류의 작업만
-하는 머신이면 `defaultDomain`을 설정한다. 확인은 `/hq-doctor`로 한다.
+`/hq-init` — 질문 세 개에 답하면 끝, 그다음 Claude Code 재시작 — 그리고 `/hq-dashboard`.
 
-### 그 외 모든 에이전트 (범용)
-
-저장소를 클론하고, HQ를 만들고, 쓰던 에이전트를 감싸면 된다. 플러그인도 훅도 필요 없다.
+### 그 외 모든 에이전트
 
 ```bash
 git clone https://github.com/lji151/session-hq
-node session-hq/scripts/hq.mjs init --domains video,apps,business
+node session-hq/scripts/hq.mjs init
+node session-hq/scripts/hq.mjs wrap --domain <d> -- <agent>
+node session-hq/scripts/hq.mjs dashboard
 ```
 
-`wrap`은 에이전트가 시작되기 전에 해당 도메인의 상태를 출력하고, 끝난 뒤에 무언가 기록되었는지
-확인한다. `--` 뒤는 전부 그대로 전달되는 사용자의 명령이며, 종료 코드도 그대로 전파된다.
-
-```bash
-node scripts/hq.mjs wrap --domain video  -- codex
-node scripts/hq.mjs wrap --domain apps   -- aider --model <your-model> src/
-node scripts/hq.mjs wrap --domain apps   -- my-local-agent --serve
-```
-
-아무도 기억할 필요가 없도록 별칭으로 만들어 두자.
-
-```bash
-alias agent='node ~/session-hq/scripts/hq.mjs wrap --domain apps -- my-local-agent'
-```
-
-**또는 에이전트에게 프로토콜 자체를 알려 줘도 된다.** 쓰는 도구가 읽는 지시 파일(`AGENTS.md`,
-`GEMINI.md`, `.cursorrules`, 시스템 프롬프트 등)에 세 줄을 붙여 넣는다.
-
-```markdown
-세션 시작 시 실행: node ~/session-hq/scripts/hq.mjs inject --print --domain apps
-아이디어는 `hq.mjs inbox "<한 줄>"`, 결정은 `hq.mjs decide "<한 줄>"` 로 기록할 것.
-끝내기 전에 status-apps.md 갱신: 상태 / 다음 / 대기 / 배제됨 / 갱신일.
-```
-
-이건 **강제가 아니라 관행이다.** 에이전트가 따르게 만드는 장치는 없다. 적어도 `wrap`은 읽기가 실제로
-일어나는 것과 빠뜨린 게 걸리는 것까지는 보장한다. 어댑터마다 무엇을 보장하는지는
-[docs/adapters.md](docs/adapters.md)에 정리해 두었다.
+대부분에게는 이게 전부다. `wrap`의 옵션, CLI로 감쌀 수 없는 도구를 위한 지시 파일 관행, 그 밖의
+모든 플래그는 [docs/adapters.md](docs/adapters.md)와 [docs/config.md](docs/config.md)에 있다.
 
 ## 동작 방식
 
@@ -255,11 +226,14 @@ flowchart LR
 
 ### 한 화면에서 전부 보기
 
-도메인이 다섯 개쯤 되면 전체 그림을 머릿속에 담아 둘 수 없다. `dashboard`는 모든 상태 파일을 한 화면에
-접어 넣고, 무엇이 있는지 나열하는 대신 정작 궁금한 것 — *내가 무엇을 놓쳤나* — 에 답한다.
+도메인이 다섯 개쯤 되면 전체 그림을 머릿속에 담아 둘 수 없다. `hq.mjs dashboard` — 또는
+`/hq-dashboard` — 는 페이지 하나를 만들어 열어 주고, 다른 무엇보다 먼저 정작 궁금한 것 —
+*내가 무엇을 놓쳤나* — 에 답한다.
+
+<sub>같은 그림을 텍스트로, 터미널이나 스크린 리더용 (`dashboard --terminal`):</sub>
 
 ```console
-$ node scripts/hq.mjs dashboard
+$ node scripts/hq.mjs dashboard --terminal
 
 session-hq dashboard — ~/hq
 3 domains · stale after 48h · generated 2026-02-04 09:12 UTC
@@ -287,12 +261,12 @@ LATEST DECISIONS
   2026-01-31 | cold opens replace framing intros | video
 ```
 
-`--md`는 같은 내용을 마크다운으로 낸다. `--html <파일>`은 인라인 CSS만 쓰고 스크립트도 네트워크도
-없는 자체 완결 페이지를 만들어, 보조 모니터에 띄워 두기 좋다. Claude Code에서는 `/hq-dashboard`.
+서버도, 포트도, 페이지 안 스크립트도 없다 — 다시 실행하면, 또는 `--watch`를 붙이면 계속 재생성되는
+HTML일 뿐이다. 그 밖의 모든 화면과 플래그는 [docs/config.md](docs/config.md#the-dashboard)에 있다.
 
 ### 대표 자리에 앉는 두 가지 방법
 
-**직접 본다.** 전체 그림이 필요할 때 `hq.mjs dashboard`나 `/hq-dashboard`를 돌리면 된다. 필요할 때만,
+**직접 본다.** 페이지가 필요할 때 `hq.mjs dashboard`나 `/hq-dashboard`를 돌리면 된다. 필요할 때만,
 선택적으로. 세션도 따로 필요 없다.
 
 **또는 에이전트가 하루 종일 본다.** *오케스트레이터 세션*은 도메인이 `orchestrator.domain`(기본값
@@ -357,20 +331,22 @@ d-4f0c21로 video에 전달했습니다(높은 우선순위). dispatches.md에 �
 ### 각자 방식대로 쓰기
 
 위의 어느 것도 정해진 워크플로가 아니다. 고정된 건 상태 파일 형식 하나뿐이고, 세션을 어떻게 나눌지도
-HQ를 어떻게 볼지도 전부 취향껏 돌릴 수 있는 다이얼이다. 실제로 쓰이는 여섯 가지 형태를 적어 둔다.
+HQ를 어떻게 볼지도 전부 취향껏 돌릴 수 있는 다이얼이다. `hq.mjs init --profile <단어>` (또는 `init`이
+묻는 세 번째 질문)가 알림 주기를 대신 정해 준다. 실제로 쓰이는 여섯 가지 형태를 적어 둔다.
 
-**혼자, 가시성만.** 프로젝트당 세션 하나, `update.mode: "on-stop"`, 오케스트레이터 없음. 그림이
-필요할 때 `hq.mjs dashboard`를 돌린다. 기본 설치 상태이며 대부분에게는 이것으로 충분하다.
+**혼자, 가시성만.** `--profile gentle` — 프로젝트당 세션 하나, 세션 끝에 부드러운 알림 한 번,
+오케스트레이터 없음. 페이지가 필요할 때 `hq.mjs dashboard`를 돌린다. 기본 설치 상태이며 대부분에게는
+이것으로 충분하다.
 
-**오케스트레이터 주도.** `HQ_DOMAIN=hq`인 조율 세션 하나가 HQ 전체를 주입받고 `dispatch` / `done` /
-`ack`을 쓴다. 부서 세션은 자유롭게 닫고 다시 연다 — 기록이 디스크에 있으므로 세션이 사라져도 잃는 것이
-없다.
+**오케스트레이터 주도.** `--profile orchestrator` — `HQ_DOMAIN=hq`인 조율 세션 하나가 HQ 전체를
+주입받고 `dispatch` / `done` / `ack`을 쓴다. 부서 세션은 자유롭게 닫고 다시 연다 — 기록이 디스크에
+있으므로 세션이 사라져도 잃는 것이 없다.
 
-**엄격한 인수인계 (팀).** `update.enforce: true`로 기록 없이는 세션이 끝나지 않게 하고, HQ 폴더를
-공유 git 저장소에 두고, `decisions.md`를 팀의 결정 로그로 쓴다. 다른 파일처럼 PR에서 리뷰된다.
+**엄격한 인수인계 (팀).** `--profile strict` — 기록 없이는 세션이 끝나지 않는다. HQ 폴더를 공유 git
+저장소에 두고, `decisions.md`를 팀의 결정 로그로 쓴다. 다른 파일처럼 PR에서 리뷰된다.
 
-**습관 들이기.** 습관이 잡힐 때까지 `update.mode: "periodic"`, `everyNTools: 40`,
-`minMinutesBetween: 20`. 아무도 알림이 필요 없어지면 `on-stop`으로 되돌린다.
+**습관 들이기.** `--profile coaching` — 습관이 잡힐 때까지 도구 호출 40번마다 알림. 아무도 알림이
+필요 없어지면 `--profile gentle`로 되돌린다.
 
 **여러 에이전트·로컬 모델 혼용.** Claude Code는 플러그인 훅으로, 나머지는 `hq.mjs wrap`이나 지시
 파일로 — HQ는 하나만 둔다. 컨텍스트 창이 작으면 `inject.maxLines`를 낮추고(8k 창에서 15~25),
@@ -385,7 +361,8 @@ HQ를 어떻게 볼지도 전부 취향껏 돌릴 수 있는 다이얼이다. �
 ## 주기 설정
 
 작업 방식에 맞지 않는 잔소리는 결국 꺼 버리게 되고, 그러면 체계 전체가 썩는다. 그래서 주기는 일급 설정
-으로 뒀다. HQ 루트의 `hq.config.json`이다.
+으로 뒀다 — `hq.mjs init --profile gentle|coaching|strict`로 고르거나 (또는 `init`이 묻는 세 번째
+질문으로), 아니면 HQ 루트의 `hq.config.json`에 직접 설정한다.
 
 ```json
 {
@@ -411,11 +388,11 @@ HQ를 어떻게 볼지도 전부 취향껏 돌릴 수 있는 다이얼이다. �
 | `update.enforce` | 불리언 | `on-stop` 전용. `false`(기본값)는 알림, `true`는 파일을 갱신할 때까지 종료를 **차단**한다. |
 | `language` | `en` · 임의의 태그 | 생성되는 템플릿의 언어 힌트. |
 
-실제로 쓰이는 세 가지 설정:
+실제로 쓰이는 세 가지 설정이자, 각각 프로필 이름이기도 하다:
 
-- **가벼움** — `mode: "on-stop"`, `enforce: false`. 종료 시 알림 한 번, 무시해도 된다. 기본값이다.
-- **코칭** — `mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20`. 팀이 습관을 들이는 동안 유용하다.
-- **엄격** — `mode: "on-stop"`, `enforce: true`. 기록하지 않으면 세션이 끝나지 않는다. 인수인계 누락이
+- **`gentle`** — `mode: "on-stop"`, `enforce: false`. 종료 시 알림 한 번, 무시해도 된다. 기본값이다.
+- **`coaching`** — `mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20`. 팀이 습관을 들이는 동안 유용하다.
+- **`strict`** — `mode: "on-stop"`, `enforce: true`. 기록하지 않으면 세션이 끝나지 않는다. 인수인계 누락이
   다른 사람의 오전을 통째로 날리는 공유 저장소에 적합하다. Stop 훅의 차단 결정을 사용하며, 실제로 그만큼
   성가시게 느껴진다.
 
@@ -507,7 +484,7 @@ HQ와 잘 어울리는 패턴들이다. 남의 인프라를 통째로 물려받�
 
 - [docs/adapters.md](docs/adapters.md) — 어댑터 세 종류, 각각이 보장하는 것, 새로 만드는 법
 - [docs/design.md](docs/design.md) — 문제 정의, 아키텍처, 설계상의 트레이드오프
-- [docs/config.md](docs/config.md) — 모든 설정 키와 `wrap` 레퍼런스
+- [docs/config.md](docs/config.md) — 모든 설정 키와 `init`/`wrap`/`dashboard` 레퍼런스
 - [docs/case-studies.md](docs/case-studies.md) — 이것이 없을 때 무엇이 잘못되는지에 대한 사례 세 편
 - [docs/security.md](docs/security.md) — 무엇이 실행되는지, 신뢰 경계, 제보 방법
 - [llms.txt](llms.txt) — 같은 지도를 한 파일로. 저장소를 요약하려는 사람(또는 도구)을 위한 것

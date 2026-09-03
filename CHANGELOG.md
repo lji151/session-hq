@@ -6,6 +6,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-02-06
+
+Most people are not power users. Three dashboard renderings and a wall of config is how the
+project went unused rather than used daily; this release gives them one thing to look at and an
+easy way to choose how they want to be reminded. File formats, the protocol, and the hooks are
+unchanged — every 0.1.0 HQ folder keeps working exactly as it did.
+
+### Added
+
+- **`hq.mjs dashboard` opens a page.** With no flags, it now writes `<hqRoot>/dashboard.html` and
+  opens it in the default browser (`cmd /c start` on Windows, `open` on macOS, `xdg-open` on
+  Linux — spawned detached, never waited on), printing one line: where the file is and how to
+  keep it fresh. `--watch [seconds=30]` keeps regenerating the file and has the page auto-refresh
+  itself via `<meta http-equiv="refresh">`; no server, no port, Ctrl-C ends it. `--no-open` (or an
+  open failure) still prints that same one line. The previous default text view moves behind
+  `--terminal` (byte-for-byte unchanged); `--md` and `--html <file>` are unchanged.
+- **The page leads with what you missed.** Stale, Blocked, Awaiting review and Untouched now come
+  before the domain table and the inbox/decisions counts, and it wraps at phone width.
+- **`hq.mjs init` asks three questions.** On a TTY, with no `--root`/`--domains`/`--profile`
+  given, `init` asks where the HQ lives, what the domains are, and how sessions should be
+  reminded — defaults in brackets, Enter accepts them. A non-TTY run or `--yes` skips straight to
+  the defaults. Flags still take precedence over their matching question, one at a time.
+- **`--profile gentle|coaching|strict|orchestrator`**, for `init` or as the third question's
+  answer, sets `update.*` to a named cadence people actually run (see
+  [docs/config.md](docs/config.md#profiles)). `orchestrator` uses the same cadence as `gentle`
+  and prints how to start the coordinating session (`HQ_DOMAIN=hq`).
+- **`init` ends with something to look at.** Every run now (re)writes `dashboard.html` from
+  whatever configuration is actually on disk and prints its path.
+
+### Changed
+
+- **README Quick start is three commands per path**, nothing else. Every other flag, the
+  instruction-file example, and the terminal/markdown dashboard views moved to
+  [docs/config.md](docs/config.md) and [docs/adapters.md](docs/adapters.md), which are now the
+  first place to look for anything beyond the two quick-start paths.
+- `/hq-dashboard` opens the page and separately replies in chat with the four lists (via
+  `--terminal`), instead of reading a table back row by row.
+- `/hq-init` now asks the same three questions itself, in one chat message, and passes the
+  answers through as `--root`/`--domains`/`--profile`.
+
+### Notes
+
+- Two 0.1.0 tests asserted terminal output from a bare `dashboard` call, which is now the
+  page-opening default; both were updated to pass `--terminal` rather than weakened or dropped.
+- 106 tests (up from 93), still no network calls and no committed fixtures.
+
 ## [0.1.0] — 2026-01-31
 
 Initial release.
@@ -88,5 +134,6 @@ Initial release.
 - Hooks load at session start, so Claude Code must be restarted after installing.
 - Every adapter stays silent on a machine with no HQ configured; `wrap` runs the command anyway.
 
-[Unreleased]: https://github.com/lji151/session-hq/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/lji151/session-hq/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/lji151/session-hq/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/lji151/session-hq/releases/tag/v0.1.0

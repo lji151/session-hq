@@ -3,7 +3,13 @@
 A shared, file-based headquarters for AI coding-agent sessions. One markdown status file per
 domain, read at session start and written at session end, plus an ideas inbox, a decision log,
 and a dispatch queue. The protocol is plain markdown; `scripts/hq.mjs` is a dependency-free Node
-CLI; the Claude Code plugin is one adapter over it. Version 0.1.0, MIT.
+CLI; the Claude Code plugin is one adapter over it. Version 0.2.0, MIT.
+
+Two things make it approachable rather than a wall of config: `dashboard` with no flags writes one
+page and opens it (the terminal and markdown views are still there, behind `--terminal`/`--md`),
+and `init` on a TTY asks exactly three questions — where the HQ lives, what the domains are, and
+how sessions should be reminded (`--profile gentle|coaching|strict|orchestrator`) — rather than
+requiring config-file literacy up front.
 
 ## Who it is for
 
@@ -24,9 +30,11 @@ CLI; the Claude Code plugin is one adapter over it. Version 0.1.0, MIT.
 
 ## Commands
 
-- `init`, `inject`, `remind`, `update-check`, `wrap` — set up and run a session
+- `init` — three questions on a TTY (`--root`, `--domains`, `--profile` take precedence); `inject`,
+  `remind`, `update-check`, `wrap` — set up and run a session
 - `dispatch`, `done`, `ack`, `dispatches` — hand work to a domain and review the result
-- `dashboard` — every domain on one screen; `--md` and `--html <file>`
+- `dashboard` — one page, opened for you by default; `--watch [seconds]` keeps it live; `--terminal`
+  and `--md` for text; `--html <file>` for a custom path
 - `inbox`, `decide`, `doctor`, `memory-lint`, `leak-check`
 - Slash-command equivalents live in [commands/](commands/), one file each.
 
@@ -39,11 +47,13 @@ CLI; the Claude Code plugin is one adapter over it. Version 0.1.0, MIT.
 - **Reads four environment variables**, all its own: `HQ_ROOT`, `HQ_DOMAIN`, `HQ_MEMORY_DIR`,
   `CLAUDE_PLUGIN_ROOT`. Check with `grep -roE "env\.[A-Z_]+" scripts/`.
 - **Writes only inside the HQ root** — `status-<domain>.md`, `ideas-inbox.md`, `decisions.md`,
-  `dispatches.md`, `hq.config.json`, `.state/<session-id>.json` — plus the path you pass to
-  `dashboard --html`. Check with `grep -rn "writeFileSync\|mkdirSync" scripts/`.
-- **Runs one external process, and only on request:** the command after `--` in `wrap`
-  ([scripts/lib/wrap.mjs](scripts/lib/wrap.mjs)); `leak-check` also shells out to `git ls-files`.
-- **93 tests**, no network and no committed fixtures: `node --test`.
+  `dispatches.md`, `hq.config.json`, `.state/<session-id>.json`, `dashboard.html` — plus the path
+  you pass to `dashboard --html`. Check with `grep -rn "writeFileSync\|mkdirSync" scripts/`.
+- **Runs external processes only on request:** the command after `--` in `wrap`
+  ([scripts/lib/wrap.mjs](scripts/lib/wrap.mjs)); `dashboard` opens the default browser on the page
+  it writes, unless `--no-open` ([scripts/lib/dashboard.mjs](scripts/lib/dashboard.mjs)); `leak-check`
+  also shells out to `git ls-files`.
+- **106 tests**, no network and no committed fixtures: `node --test`.
 - [Security notes](docs/security.md): threat model, trust boundary, reporting.
 
 ## Non-goals, stated in the README
@@ -64,7 +74,7 @@ CLI; the Claude Code plugin is one adapter over it. Version 0.1.0, MIT.
 
 ## How to verify the repo
 
-- `node --test` — 93 tests
+- `node --test` — 106 tests
 - `claude plugin validate . --strict` and `claude plugin validate .claude-plugin/plugin.json --strict`
 - `node scripts/leak-check.mjs --denylist .github/leak-denylist.example.txt` — credential-shaped
   pattern scan over tracked files

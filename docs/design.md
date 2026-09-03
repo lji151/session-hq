@@ -254,7 +254,8 @@ and enough delegated work to need a routing discipline.
   everyone knows.
 - **No automatic summarisation.** A generated status entry is a plausible-sounding entry, which
   is exactly the thing that makes the file untrustworthy. The plugin asks; the session writes.
-- **No dashboard.** The files are the interface. A dashboard would be another thing that can be
-  out of date.
+- **No live server for the dashboard.** `dashboard` writes a static file and, optionally,
+  regenerates it on a timer (`--watch`); there is no process listening on a port. The files
+  remain the interface — the page is a rendering of them, not a second source of truth.
 - **No account or usage-limit features.** One account, many sessions. Anything else is out of
   scope by design, not by omission.

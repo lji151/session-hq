@@ -213,18 +213,58 @@ Language hint for generated templates and prose. It does not change the CLI's ow
 
 ---
 
+## Setting up (`init`)
+
+```bash
+node scripts/hq.mjs init [--root <dir>] [--domains a,b,c] [--profile gentle|coaching|strict|orchestrator] [--yes] [--force]
+```
+
+On a TTY, with none of `--root`/`--domains`/`--profile` given, `init` asks exactly three questions
+via `node:readline/promises`, Enter accepting the default in brackets:
+
+1. `Where should the HQ live? [~/hq]`
+2. `What are your domains? (projects, clients, or life areas — you can rename later) [video, apps, business]`
+3. `How should sessions be reminded?` — `[1] gentle` (default), `[2] coaching`, `[3] strict`.
+
+A non-TTY run (a script, CI) or `--yes` skips straight to the defaults, silently. A flag always
+wins over its matching question — passing `--profile strict` on a TTY still asks about the root
+and the domains, but not the cadence.
+
+| Option | Effect |
+|---|---|
+| `--root <dir>` | Where the HQ lives. Accepts an existing folder. |
+| `--domains a,b,c` | The domain list. |
+| `--profile <name>` | `gentle` \| `coaching` \| `strict` \| `orchestrator` — see the mapping below. |
+| `--yes` | Skip the questions; use flags where given, defaults everywhere else. |
+| `--force` | Overwrite files that already exist. Without it, everything is never-overwrite: `kept` if present, `created` if not. |
+
+`init` never overwrites an existing file without `--force`, and at the end it (re)writes
+`dashboard.html` from whatever configuration actually ended up on disk and prints its path — so
+even the very first run ends with something to look at, not just a list of file names.
+
 ## Profiles
 
 Nothing here is a prescribed workflow. The status-file format is the only fixed part; everything
-else is a dial. These are shapes people run, with the exact settings that produce them.
+else is a dial. `--profile` sets only `update.*`, using existing keys — it is a name for a
+combination people actually run, not a new setting:
+
+| `--profile` | `update.*` |
+|---|---|
+| `gentle` (default) | `mode: "on-stop"`, `enforce: false` — one reminder at session end, ignorable |
+| `coaching` | `mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20` — a nudge while a habit forms |
+| `strict` | `mode: "on-stop"`, `enforce: true` — a session cannot end without writing back |
+| `orchestrator` | same as `gentle` — what makes it "orchestrator" is running one session with `HQ_DOMAIN=hq`, which `init` prints a reminder about |
+
+And these are shapes people run day to day, with the exact settings that produce them — most are a
+profile plus a habit, not a config key:
 
 | Profile | Config | Commands you use |
 |---|---|---|
-| **Solo, just visibility** | `update.mode: "on-stop"`, `update.enforce: false`, no `HQ_DOMAIN=hq` session | `dashboard` when you want it |
-| **Orchestrator-led** | defaults, plus one session with `HQ_DOMAIN=hq` | `dispatch`, `done`, `ack`, `dashboard` |
-| **Strict handoffs (team)** | `update.enforce: true`, `hqRoot` inside a shared git repo | `decisions.md` as the team's decision log |
-| **Coaching a new habit** | `update.mode: "periodic"`, `everyNTools: 40`, `minMinutesBetween: 20` | relax to `on-stop` once it sticks |
-| **Mixed agents** | defaults; Claude Code via hooks, others via `wrap` or an instruction file | `wrap --domain <d> -- <agent>` |
+| **Solo, just visibility** | `--profile gentle`, no `HQ_DOMAIN=hq` session | `dashboard` when you want it |
+| **Orchestrator-led** | `--profile orchestrator`, plus one session with `HQ_DOMAIN=hq` | `dispatch`, `done`, `ack`, `dashboard` |
+| **Strict handoffs (team)** | `--profile strict`, `hqRoot` inside a shared git repo | `decisions.md` as the team's decision log |
+| **Coaching a new habit** | `--profile coaching` | relax to `--profile gentle` once it sticks |
+| **Mixed agents** | any profile; Claude Code via hooks, others via `wrap` or an instruction file | `wrap --domain <d> -- <agent>` |
 | **Small-context local model** | `inject.maxLines: 20`, `orchestrator.injectDashboard: false` | same as any other profile |
 
 Notes on the ones with a trap in them:
@@ -284,24 +324,35 @@ Two things worth being explicit about:
 ## The dashboard
 
 ```bash
-node scripts/hq.mjs dashboard [--stale-hours N] [--md | --html <file>]
+node scripts/hq.mjs dashboard [--watch [seconds]] [--no-open] [--terminal | --md | --html <file>] [--stale-hours N]
 ```
 
-One screen for every domain. It exists to answer *what have I missed*, so the three lists under the
-table matter more than the table:
+With no view flag, this writes `<hqRoot>/dashboard.html` and opens it in the default browser
+(Windows: `cmd /c start`; macOS: `open`; Linux: `xdg-open` — spawned detached, never waited on),
+then prints one line: where the file is and how to keep it fresh. It exists to answer *what have I
+missed*, so the page leads with the four lists that matter more than the table:
 
 - **Stale**, oldest first — unverified, not necessarily wrong.
 - **Blocked** — domain, workstream, and what it is waiting on.
+- **Awaiting review** — dispatched work a department finished, nobody has checked yet.
 - **Untouched** — domains with no workstreams, or only the placeholder block `init` writes. A domain
   in this list is either finished or forgotten, and the difference is worth knowing.
 
-Then the inbox count and the last three decisions.
+Then the domain table, and the inbox count and the last three decisions.
 
 | Option | Effect |
 |---|---|
-| `--stale-hours N` | Override `inject.staleAfterHours` for this one look. |
+| *(none)* | Write `<hqRoot>/dashboard.html` and open it. On open failure, or with `--no-open`, the same one line still prints — just the path. |
+| `--watch [seconds]` | Keep running; regenerate the file every `seconds` (default `30`) and have the page auto-refresh itself via `<meta http-equiv="refresh">`. No server, no port. Ctrl-C ends it. |
+| `--no-open` | Skip opening the browser. Required in any script or test — nothing here should ever open a browser unattended. |
+| `--terminal` | The plain-text view in a shell, for piping or a screen reader. |
 | `--md` | The same picture as markdown, for pasting into a note or an issue. |
-| `--html <file>` | Write a self-contained page — inline CSS, no scripts, no network — to keep open on a second monitor. Static: regenerate to refresh. |
+| `--html <file>` | Write the self-contained page to a specific path instead of `<hqRoot>/dashboard.html`, and do not open it. For a custom location — a synced folder, a second monitor's own directory. |
+| `--stale-hours N` | Override `inject.staleAfterHours` for this one look. Combines with any of the above. |
+
+The page itself is inline CSS with zero JavaScript and no network requests, readable at phone
+width, and follows `prefers-color-scheme` for dark or light. `--watch-iterations <n>` exists only
+for this project's own tests, to bound the regenerate loop; it is not a setting to reach for.
 
 Counting rules, so the numbers are not mysterious:
 
@@ -311,7 +362,8 @@ Counting rules, so the numbers are not mysterious:
 - **Next** counts blocks with a real `Next` line by the same rule.
 - A domain is **untouched** when every block is the placeholder from `init`.
 
-Under Claude Code the same thing is `/hq-dashboard`.
+Under Claude Code the same thing is `/hq-dashboard`, which opens the page and also replies in
+chat with the four lists, pulled from `--terminal`.
 
 ## Running an agent inside an HQ session (`wrap`)
 
