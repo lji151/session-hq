@@ -25,8 +25,9 @@ at session start, written at session end.
   (`leak-check` also calls `git ls-files`.)
 - **93 tests**, no network and no committed fixtures: `node --test`.
 - **CI:** ubuntu, macos and windows on Node 18 and 22 — `.github/workflows/test.yml`.
-- **Verified locally on Windows 11** with Claude Code 2.1.x, including a live install and hook run;
-  Linux and macOS are covered by the CI matrix rather than by hand.
+- **Verified by hand on Windows 11** (Claude Code 2.1.x, live install and hook run) **and on Linux**
+  (WSL Ubuntu, Node 22: full suite, `init`, `wrap` exit-code propagation, `dashboard`). macOS is
+  covered by the CI matrix only.
 - **Three adapters:** Claude Code hooks (automatic), `hq.mjs wrap` (any agent CLI), an instruction
   file (convention, not enforcement). [docs/adapters.md](docs/adapters.md) says what each guarantees.
 - **MIT licensed.** Security notes and trust boundary: [docs/security.md](docs/security.md).
@@ -34,7 +35,7 @@ at session start, written at session end.
 </details>
 
 [English](README.md) · [한국어](README.ko.md)
-[![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
+[![tests](https://github.com/lji151/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/lji151/session-hq/actions/workflows/test.yml)
 
 ---
 
@@ -160,7 +161,7 @@ synced drive, a notes vault. Nothing here needs a database, a daemon, or a netwo
 Hooks read and check the file for you. Requires Node ≥ 18, which Claude Code already needs.
 
 ```bash
-claude plugin marketplace add your-github-username/session-hq
+claude plugin marketplace add lji151/session-hq
 claude plugin install session-hq@session-hq
 ```
 
@@ -173,7 +174,7 @@ ran it is still running without them. Give each session a domain with `HQ_DOMAIN
 Clone the repo, create the HQ, and wrap your agent. No plugin, no hooks.
 
 ```bash
-git clone https://github.com/your-github-username/session-hq
+git clone https://github.com/lji151/session-hq
 node session-hq/scripts/hq.mjs init --domains video,apps,business
 ```
 

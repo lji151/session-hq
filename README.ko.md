@@ -25,8 +25,9 @@ Gemini CLI, Cursor, aider, 혹은 셸에서 돌리는 로컬 모델까지 — �
   (`leak-check`은 `git ls-files`도 부른다.)
 - **테스트 93개.** 네트워크도, 저장소에 넣어 둔 픽스처도 없다: `node --test`.
 - **CI:** ubuntu·macos·windows × Node 18·22 — `.github/workflows/test.yml`.
-- **Windows 11에서 직접 검증**했다(Claude Code 2.1.x, 실제 설치와 훅 실행 포함). Linux와 macOS는
-  손으로가 아니라 CI 매트릭스로 커버한다.
+- **Windows 11과 Linux에서 직접 검증**했다. Windows 11은 Claude Code 2.1.x로 실제 설치와 훅 실행까지,
+  Linux는 WSL Ubuntu·Node 22에서 전체 테스트와 `init`, `wrap`의 종료 코드 전파, `dashboard`까지
+  돌렸다. macOS는 CI 매트릭스로만 커버한다.
 - **어댑터 세 가지:** Claude Code 훅(자동), `hq.mjs wrap`(모든 에이전트 CLI), 지시 파일(강제가
   아니라 관행). 각각 무엇을 보장하는지는 [docs/adapters.md](docs/adapters.md)에 있다.
 - **MIT 라이선스.** 보안 메모와 신뢰 경계는 [docs/security.md](docs/security.md).
@@ -34,7 +35,7 @@ Gemini CLI, Cursor, aider, 혹은 셸에서 돌리는 로컬 모델까지 — �
 </details>
 
 [English](README.md) · [한국어](README.ko.md)
-[![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
+[![tests](https://github.com/lji151/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/lji151/session-hq/actions/workflows/test.yml)
 
 ---
 
@@ -156,7 +157,7 @@ Last updated 19h ago (from stamp).
 훅이 읽기와 검사를 대신 해 준다. Claude Code가 이미 요구하는 Node 18 이상이면 된다.
 
 ```bash
-claude plugin marketplace add your-github-username/session-hq
+claude plugin marketplace add lji151/session-hq
 claude plugin install session-hq@session-hq
 ```
 
@@ -169,7 +170,7 @@ claude plugin install session-hq@session-hq
 저장소를 클론하고, HQ를 만들고, 쓰던 에이전트를 감싸면 된다. 플러그인도 훅도 필요 없다.
 
 ```bash
-git clone https://github.com/your-github-username/session-hq
+git clone https://github.com/lji151/session-hq
 node session-hq/scripts/hq.mjs init --domains video,apps,business
 ```
 

@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "description": "A shared, file-based headquarters for AI agent sessions (Claude Code plugin + agent-neutral CLI): per-domain status files read at session start and updated at session end, an ideas inbox, and a decisions log.",
   "author": {
-    "name": "Your Name",
-    "email": "you@example.com",
-    "url": "https://github.com/your-github-username"
+    "name": "Jung Inn Lee",
+    "email": "277790932+lji151@users.noreply.github.com",
+    "url": "https://github.com/lji151"
   },
-  "homepage": "https://github.com/your-github-username/session-hq",
-  "repository": "https://github.com/your-github-username/session-hq",
+  "homepage": "https://github.com/lji151/session-hq",
+  "repository": "https://github.com/lji151/session-hq",
   "license": "MIT",
   "keywords": [
     "session-management",

@@ -3,19 +3,19 @@
   "name": "session-hq",
   "description": "Single-plugin marketplace for session-hq, a persistent cross-session headquarters for AI agent sessions.",
   "owner": {
-    "name": "Your Name",
-    "email": "you@example.com"
+    "name": "Jung Inn Lee",
+    "email": "277790932+lji151@users.noreply.github.com"
   },
   "plugins": [
     {
       "name": "session-hq",
       "description": "A shared, file-based headquarters for AI agent sessions (Claude Code plugin + agent-neutral CLI): per-domain status files read at session start and updated at session end, an ideas inbox, and a decisions log.",
       "author": {
-        "name": "Your Name"
+        "name": "Jung Inn Lee"
       },
       "category": "productivity",
       "source": "./",
-      "homepage": "https://github.com/your-github-username/session-hq"
+      "homepage": "https://github.com/lji151/session-hq"
     }
   ]
 }

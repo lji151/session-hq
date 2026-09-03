@@ -15,7 +15,7 @@ without it. There is nothing to install — no dependencies and no build step, w
 worth preserving.
 
 ```bash
-git clone https://github.com/your-github-username/session-hq
+git clone https://github.com/lji151/session-hq
 cd session-hq
 node --test                      # 40+ tests, no network, no fixtures on disk
 node scripts/hq.mjs doctor       # against your own HQ, if you have one

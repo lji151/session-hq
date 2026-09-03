@@ -88,5 +88,5 @@ Initial release.
 - Hooks load at session start, so Claude Code must be restarted after installing.
 - Every adapter stays silent on a machine with no HQ configured; `wrap` runs the command anyway.
 
-[Unreleased]: https://github.com/your-github-username/session-hq/compare/v0.1.0...HEAD
-[0.1.0]: https://github.com/your-github-username/session-hq/releases/tag/v0.1.0
+[Unreleased]: https://github.com/lji151/session-hq/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/lji151/session-hq/releases/tag/v0.1.0
