@@ -1,0 +1,9 @@
+{
+  "domains": ["video", "apps", "business"],
+  "defaultDomain": null,
+  "inject": { "on": "session-start+compact", "maxLines": 60, "staleAfterHours": 48 },
+  "update": { "mode": "on-stop", "everyNTools": 0, "minMinutesBetween": 20, "enforce": false },
+  "inbox": { "file": "ideas-inbox.md" },
+  "decisions": { "file": "decisions.md" },
+  "language": "en"
+}
