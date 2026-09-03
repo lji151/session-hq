@@ -1,6 +1,10 @@
 # Contributing
 
-Thanks for looking. The product is a markdown HQ folder plus a dependency-free Node CLI; the
+Thanks for looking. This repository was itself built with an agent orchestrating the work under
+written briefs, with tests and the leak-check run before every commit — contributions from humans
+and from agents are equally welcome, and the same gates apply to both.
+
+The product is a markdown HQ folder plus a dependency-free Node CLI; the
 Claude Code plugin is the first adapter on top of it. The surface is deliberately small, so the
 most useful contributions are usually sharpening what is here rather than adding to it.
 

@@ -6,6 +6,8 @@ session-hq는 AI 코딩 에이전트 세션들을 위한 파일 기반 공유 �
 Gemini CLI, Cursor, aider, 혹은 셸에서 돌리는 로컬 모델까지 — 도메인마다 마크다운 상태 파일 하나를
 두고, 세션 시작 시 읽고 세션 종료 시 기록한다.
 
+**상태: 0.1 — 초기 단계. 만든 사람이 매일 쓰고 있으며, API는 바뀔 수 있다.**
+
 [English](README.md) · [한국어](README.ko.md)
 [![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
 
@@ -460,6 +462,16 @@ HQ와 잘 어울리는 패턴들이다. 남의 인프라를 그대로 물려받�
 - [docs/design.md](docs/design.md) — 문제 정의, 아키텍처, 설계상의 트레이드오프
 - [docs/config.md](docs/config.md) — 모든 설정 키와 `wrap` 레퍼런스
 - [docs/case-studies.md](docs/case-studies.md) — 이것이 없을 때 무엇이 잘못되는지에 대한 사례 세 편
+
+## 어떻게 만들었나
+
+여기 담긴 프로토콜과 운영 방식은 책상에서 나온 것이 아니다. 여러 에이전트 세션을 병렬로 돌리면서 HQ
+폴더를 몇 달간 손으로 관리한 데서 나왔고, 다섯 항목 형식·필수 `배제됨` 줄·도메인별 파일·dispatch
+대기열은 전부 그것이 없어서 대가를 치른 적이 있기 때문에 존재한다.
+
+코드는 Claude Code를 오케스트레이터로 두고 썼다. 만든 사람이 지시하고 검토하며, 코딩 계층 에이전트가
+문서화된 지시서에 따라 구현하고, 커밋 전마다 테스트와 leak-check를 통과시켰다. 이 저장소는 스스로
+권하는 방식 그대로 만들어졌고, 그것이 그 권고가 실제로 통하는지 확인하는 가장 정직한 시험이기도 하다.
 
 ## 기여
 

@@ -6,6 +6,8 @@ session-hq is a shared, file-based headquarters for AI coding-agent sessions —
 Gemini CLI, Cursor, aider, or a local model in a shell — one markdown status file per domain, read
 at session start, written at session end.
 
+**Status: 0.1 — early, used daily by the author, APIs may move.**
+
 [English](README.md) · [한국어](README.ko.md)
 [![tests](https://github.com/your-github-username/session-hq/actions/workflows/test.yml/badge.svg)](https://github.com/your-github-username/session-hq/actions/workflows/test.yml)
 
@@ -479,6 +481,18 @@ adapt them without inheriting anyone's infrastructure:
 - [docs/design.md](docs/design.md) — the problem, the architecture, and the tradeoffs
 - [docs/config.md](docs/config.md) — every configuration key, and the `wrap` reference
 - [docs/case-studies.md](docs/case-studies.md) — three stories about what goes wrong without this
+
+## How this was built
+
+The protocol and the operating model are not theoretical. They come from months of running many
+parallel agent sessions with a hand-maintained HQ folder, and every rule here — the five-field
+entry, the mandatory `Ruled out` line, per-domain files, the dispatch queue — exists because its
+absence cost something.
+
+The code was then written with Claude Code acting as an orchestrator: the author directing and
+reviewing, a coding-tier agent implementing under written briefs, and tests plus a leak-check gate
+run before every commit. The repository was built the way it recommends working, which is also the
+most honest test of whether the recommendation holds.
 
 ## Contributing
 
