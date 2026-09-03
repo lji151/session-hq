@@ -6,6 +6,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Most users are not power users, so every choice here is one word — and the full-control path
+exists without getting in the way of that.
+
+### Added
+
+- **`dashboard --theme <name>`, and `dashboard.theme` in the config.** Four presets ship:
+  `auto` (the 0.2.0 look, following `prefers-color-scheme`; still the default), `paper` (warm
+  light, serif headings), `terminal` (dark, monospace, green and amber) and `slate` (cool dark,
+  sans). Each is nothing but a set of CSS variables — no rule in the stylesheet names a colour,
+  font, size or spacing of its own — so a theme is a variable map and overriding one is one line.
+  An unknown name warns on stderr and falls back to `auto` rather than failing.
+- **A `dashboard` config block**, every key optional: `theme`, `title`, `accent` (hex),
+  `font` (`mono`/`sans`/`serif`, or any CSS stack), `density` (`comfortable`/`compact`),
+  `sections` (order and visibility), `labels`, `showHqRoot`, and `decisions` (how many to list).
+  `--theme`, `--density` and `--labels` override their key for one run. `doctor` validates the
+  block: a wrong type is an error, an unrecognised name is a warning.
+- **`labels: "ko"` — a complete Korean label set**: section headings, table headers, relative
+  times, the empty-state sentences, the inbox count and the footer. An object of overrides
+  replaces single words instead, and `"base": "ko"` inside it picks which set to override. With
+  `dashboard.labels` unset the existing top-level `language` key decides, so `"language": "ko"`
+  on its own now gives a Korean page.
+- **Your own CSS.** `<hqRoot>/dashboard.css`, when it exists, is inlined after the theme's
+  variables in the same `<style>` element, so it wins wherever the two disagree.
+- **Your own markup.** `<hqRoot>/dashboard.template.html`, when it exists, replaces the built-in
+  template. The slots are `{{lang}} {{title}} {{meta}} {{css}} {{header}} {{stale}} {{blocked}}
+  {{review}} {{untouched}} {{domains}} {{inbox}} {{decisions}} {{footer}}`; an unknown slot
+  renders empty, and inserted content is never rescanned. `{{meta}}` places the `--watch` refresh
+  tag, and a template without that slot still gets the tag injected into its head — so `--watch`
+  keeps working on a template written without it in mind.
+- **`dashboard --eject`** writes the built-in template and the current theme's stylesheet into
+  the HQ root, so nobody has to start from a blank file. It never overwrites: an existing file is
+  reported as `kept`.
+- **`/hq-theme`**, a new slash command — the four presets in one message, the answer written to
+  `dashboard.theme`, the page regenerated and opened. `/hq-dashboard` now also takes a bare theme
+  word (`/hq-dashboard paper`) for a one-off look that changes no config.
+- **[docs/dashboard.md](docs/dashboard.md)** — the three tiers with an example each, the config
+  block with defaults, the label keys, and the template slots.
+
+### Changed
+
+- **`--terminal` and `--md` follow `dashboard.sections` too.** The default order leads with the
+  four what-did-I-miss lists and puts the domain table after them, which is what the page has
+  done since 0.2.0 but the text views had not. The markdown view also gained a `## Domains`
+  heading over its table. `"sections": ["domains", "stale", "blocked", "review", "untouched",
+  "inbox", "decisions"]` restores the old text layout exactly.
+
+### Notes
+
+- No file format, hook or protocol change. An existing HQ folder renders as it did unless a
+  `dashboard` block or one of the two files is added.
+- 129 tests, up from 110. All 110 are unchanged.
+
 ## [0.2.0] — 2026-02-06
 
 Most people are not power users. Three dashboard renderings and a wall of config is how the

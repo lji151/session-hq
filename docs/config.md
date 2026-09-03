@@ -46,7 +46,11 @@ That second rule is what lets you drop a config file into a folder and have it j
   "orchestrator": { "domain": "hq", "injectDashboard": true, "maxLines": 80 },
   "inbox":     { "file": "ideas-inbox.md" },
   "decisions": { "file": "decisions.md" },
-  "language":  "en"
+  "language":  "en",
+  "dashboard": { "theme": "auto", "title": null, "accent": null, "font": null,
+                 "density": "comfortable",
+                 "sections": ["stale", "blocked", "review", "untouched", "domains", "inbox", "decisions"],
+                 "labels": null, "showHqRoot": true, "decisions": 3 }
 }
 ```
 
@@ -209,7 +213,45 @@ you have one.
 
 **Type** string · **Default** `"en"`
 
-Language hint for generated templates and prose. It does not change the CLI's own output.
+Language hint for generated templates and prose. It does not change the CLI's own output, with
+one exception: when `dashboard.labels` is unset, `"ko"` here gives you a Korean dashboard.
+
+### `dashboard`
+
+```json
+"dashboard": {
+  "theme": "auto",
+  "title": null,
+  "accent": null,
+  "font": null,
+  "density": "comfortable",
+  "sections": ["stale", "blocked", "review", "untouched", "domains", "inbox", "decisions"],
+  "labels": null,
+  "showHqRoot": true,
+  "decisions": 3
+}
+```
+
+How the page looks and what it says. Every key is optional and `null` means *unset*, which is not
+the same as a value: `labels: null` follows `language`, and `title: null` takes the label set's
+own title.
+
+| Key | Type · default | Effect |
+|---|---|---|
+| `theme` | `auto` \| `paper` \| `terminal` \| `slate` · `"auto"` | The preset. `auto` is the original look and follows `prefers-color-scheme`; the other three commit to one. |
+| `title` | string or `null` · `null` | The `<title>` and the `<h1>`. |
+| `accent` | hex string or `null` · `null` | Overrides the theme's accent colour. Not a hex colour, not applied. |
+| `font` | `mono` \| `sans` \| `serif` \| a CSS font stack or `null` · `null` | Overrides body and heading fonts. |
+| `density` | `comfortable` \| `compact` · `"comfortable"` | Padding, line height, row height. |
+| `sections` | array · all seven | Which sections appear and in what order; omit a name to hide it. Honoured by `--md` and `--terminal` too. |
+| `labels` | `en` \| `ko` \| object or `null` · `null` | The words on the page. An object overrides single labels. |
+| `showHqRoot` | boolean · `true` | Whether the HQ's absolute path appears in the header. |
+| `decisions` | integer ≥ 0 · `3` | How many of the latest decisions to list. |
+
+An unrecognised `theme`, `density` or `labels` name warns and falls back rather than failing —
+`doctor` reports it as a warning too. Beyond these keys there are two files, `dashboard.css` and
+`dashboard.template.html`, that take over the styling and the markup entirely:
+[docs/dashboard.md](dashboard.md) covers all three tiers.
 
 ---
 
@@ -325,6 +367,7 @@ Two things worth being explicit about:
 
 ```bash
 node scripts/hq.mjs dashboard [--watch [seconds]] [--no-open] [--terminal | --md | --html <file>] [--stale-hours N]
+                              [--theme <name>] [--density <name>] [--labels <lang>] [--eject]
 ```
 
 With no view flag, this writes `<hqRoot>/dashboard.html` and opens it in the default browser
@@ -349,9 +392,16 @@ Then the domain table, and the inbox count and the last three decisions.
 | `--md` | The same picture as markdown, for pasting into a note or an issue. |
 | `--html <file>` | Write the self-contained page to a specific path instead of `<hqRoot>/dashboard.html`, and do not open it. For a custom location — a synced folder, a second monitor's own directory. |
 | `--stale-hours N` | Override `inject.staleAfterHours` for this one look. Combines with any of the above. |
+| `--theme <name>` | `auto` \| `paper` \| `terminal` \| `slate`, overriding `dashboard.theme` for this run. |
+| `--density <name>` | `comfortable` \| `compact`, overriding `dashboard.density` for this run. |
+| `--labels <lang>` | `en` \| `ko`, overriding `dashboard.labels` for this run. Applies to all three views. |
+| `--eject` | Write the built-in template and the current theme's CSS into the HQ root and exit, without rendering. Never overwrites. |
 
 The page itself is inline CSS with zero JavaScript and no network requests, readable at phone
-width, and follows `prefers-color-scheme` for dark or light. `--watch-iterations <n>` exists only
+width, and — on the default `auto` theme — follows `prefers-color-scheme` for dark or light.
+Four presets, a handful of config keys, and two optional files in the HQ root cover everything
+from "I want the light one" to "I want my own markup":
+[docs/dashboard.md](dashboard.md). `--watch-iterations <n>` exists only
 for this project's own tests, to bound the regenerate loop; it is not a setting to reach for.
 
 Counting rules, so the numbers are not mysterious:

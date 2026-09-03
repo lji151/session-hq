@@ -19,11 +19,12 @@ Gemini CLI, Cursor, aider, 혹은 셸에서 돌리는 로컬 모델까지 — �
   `CLAUDE_PLUGIN_ROOT`. 자격 증명이나 다른 설정은 읽지 않는다.
   (`grep -roE "env\.[A-Z_]+" scripts/`)
 - **쓰기는 HQ 루트 안에서만:** `hq.config.json`, `status-<domain>.md`, `ideas-inbox.md`,
-  `decisions.md`, `dispatches.md`, `.state/<session-id>.json`, `dashboard.html`. 그 밖에는
+  `decisions.md`, `dispatches.md`, `.state/<session-id>.json`, `dashboard.html`, 그리고
+  `dashboard --eject`를 실행했을 때만 `dashboard.css`와 `dashboard.template.html`. 그 밖에는
   `dashboard --html`에 직접 지정한 파일뿐이다. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
 - **외부 프로세스는 요청할 때만 실행한다:** `wrap`의 `--` 뒤에 쓴 명령, 그리고 `dashboard`가
   `--no-open`을 주지 않으면 여는 기본 브라우저. (`leak-check`은 `git ls-files`도 부른다.)
-- **테스트 106개.** 네트워크도, 저장소에 넣어 둔 픽스처도 없다: `node --test`.
+- **테스트 129개.** 네트워크도, 저장소에 넣어 둔 픽스처도 없다: `node --test`.
 - **CI:** ubuntu·macos·windows × Node 18·22 — `.github/workflows/test.yml`.
 - **Windows 11과 Linux에서 직접 검증**했다. Windows 11은 Claude Code 2.1.x로 실제 설치와 훅 실행까지,
   Linux는 WSL Ubuntu·Node 22에서 전체 테스트와 `init`, `wrap`의 종료 코드 전파, `dashboard`까지
@@ -264,6 +265,15 @@ LATEST DECISIONS
 서버도, 포트도, 페이지 안 스크립트도 없다 — 다시 실행하면, 또는 `--watch`를 붙이면 계속 재생성되는
 HTML일 뿐이다. 그 밖의 모든 화면과 플래그는 [docs/config.md](docs/config.md#the-dashboard)에 있다.
 
+### 내 것으로 만들기
+
+대부분은 스타일시트가 아니라 단어 하나를 원한다. `dashboard --theme paper` — 또는 `auto`,
+`terminal`, `slate` — 하나로 전체 인상이 바뀌고, `hq.config.json`에
+`"dashboard": { "theme": "paper" }`를 넣으면 그 선택이 계속 유지된다. 같은 블록에 강조색, 글꼴,
+조밀한 밀도, 어떤 섹션을 어떤 순서로 보여 줄지, 그리고 한국어 페이지를 위한 `"labels": "ko"`가 함께
+들어 있다. 그래도 부족하면 `dashboard --eject`가 실제로 쓰이는 템플릿과 CSS를 그대로 꺼내 주니 직접
+고치면 된다 — 세 단계 전부는 [docs/dashboard.md](docs/dashboard.md)에 있다.
+
 ### 대표 자리에 앉는 두 가지 방법
 
 **직접 본다.** 페이지가 필요할 때 `hq.mjs dashboard`나 `/hq-dashboard`를 돌리면 된다. 필요할 때만,
@@ -485,6 +495,7 @@ HQ와 잘 어울리는 패턴들이다. 남의 인프라를 통째로 물려받�
 - [docs/adapters.md](docs/adapters.md) — 어댑터 세 종류, 각각이 보장하는 것, 새로 만드는 법
 - [docs/design.md](docs/design.md) — 문제 정의, 아키텍처, 설계상의 트레이드오프
 - [docs/config.md](docs/config.md) — 모든 설정 키와 `init`/`wrap`/`dashboard` 레퍼런스
+- [docs/dashboard.md](docs/dashboard.md) — 테마, `dashboard` 설정 블록, 라벨, 템플릿 슬롯
 - [docs/case-studies.md](docs/case-studies.md) — 이것이 없을 때 무엇이 잘못되는지에 대한 사례 세 편
 - [docs/security.md](docs/security.md) — 무엇이 실행되는지, 신뢰 경계, 제보 방법
 - [llms.txt](llms.txt) — 같은 지도를 한 파일로. 저장소를 요약하려는 사람(또는 도구)을 위한 것

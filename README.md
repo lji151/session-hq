@@ -19,12 +19,13 @@ at session start, written at session end.
   `CLAUDE_PLUGIN_ROOT`. It reads no credentials and no other configuration.
   (`grep -roE "env\.[A-Z_]+" scripts/`)
 - **Writes only inside the HQ root:** `hq.config.json`, `status-<domain>.md`, `ideas-inbox.md`,
-  `decisions.md`, `dispatches.md`, `.state/<session-id>.json`, `dashboard.html` — plus the file
-  you name with `dashboard --html`. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
+  `decisions.md`, `dispatches.md`, `.state/<session-id>.json`, `dashboard.html`, and — only on
+  `dashboard --eject` — `dashboard.css` and `dashboard.template.html`; plus the file you name with
+  `dashboard --html`. (`grep -rn "writeFileSync\|mkdirSync" scripts/`)
 - **Runs external processes only when asked:** the command you put after `--` in `wrap`;
   `dashboard` opens your default browser unless you pass `--no-open`. (`leak-check` also calls
   `git ls-files`.)
-- **106 tests**, no network and no committed fixtures: `node --test`.
+- **129 tests**, no network and no committed fixtures: `node --test`.
 - **CI:** ubuntu, macos and windows on Node 18 and 22 — `.github/workflows/test.yml`.
 - **Verified by hand on Windows 11** (Claude Code 2.1.x, live install and hook run) **and on Linux**
   (WSL Ubuntu, Node 22: full suite, `init`, `wrap` exit-code propagation, `dashboard`). macOS is
@@ -270,6 +271,15 @@ LATEST DECISIONS
 No server, no port, no script on the page — just HTML that regenerates when you ask it to, or
 continuously with `--watch`. Every other view and flag is in [docs/config.md](docs/config.md#the-dashboard).
 
+### Make it yours
+
+Most people want one word rather than a stylesheet, so `dashboard --theme paper` — or `auto`,
+`terminal`, `slate` — changes the whole look, and `"dashboard": { "theme": "paper" }` in
+`hq.config.json` makes it stick. The same block holds an accent colour, a font, a compact
+density, which sections appear and in what order, and `"labels": "ko"` for a Korean page. When
+that is still not yours, `dashboard --eject` hands you the real template and the real CSS to edit
+in place — all three tiers are in [docs/dashboard.md](docs/dashboard.md).
+
 ### Two ways to sit in the CEO seat
 
 **You look.** Run `hq.mjs dashboard` — or `/hq-dashboard` — whenever you want the page. Optional,
@@ -502,6 +512,7 @@ adapt them without inheriting anyone's infrastructure:
 - [docs/adapters.md](docs/adapters.md) — the three adapters, what each guarantees, how to write one
 - [docs/design.md](docs/design.md) — the problem, the architecture, and the tradeoffs
 - [docs/config.md](docs/config.md) — every configuration key, and the `init`/`wrap`/`dashboard` reference
+- [docs/dashboard.md](docs/dashboard.md) — themes, the `dashboard` config block, labels, and template slots
 - [docs/case-studies.md](docs/case-studies.md) — three stories about what goes wrong without this
 - [docs/security.md](docs/security.md) — what executes, the trust boundary, reporting
 - [llms.txt](llms.txt) — the same map in one file, for anyone (or anything) summarising the repo

@@ -35,6 +35,9 @@ requiring config-file literacy up front.
 - `dispatch`, `done`, `ack`, `dispatches` — hand work to a domain and review the result
 - `dashboard` — one page, opened for you by default; `--watch [seconds]` keeps it live; `--terminal`
   and `--md` for text; `--html <file>` for a custom path
+- `dashboard --theme auto|paper|terminal|slate`, a `dashboard` config block (accent, font, density,
+  section order, `labels: "ko"`), and `--eject` for your own `dashboard.css` / template — three
+  tiers of customising one page, in [docs/dashboard.md](docs/dashboard.md)
 - `inbox`, `decide`, `doctor`, `memory-lint`, `leak-check`
 - Slash-command equivalents live in [commands/](commands/), one file each.
 
@@ -47,13 +50,14 @@ requiring config-file literacy up front.
 - **Reads four environment variables**, all its own: `HQ_ROOT`, `HQ_DOMAIN`, `HQ_MEMORY_DIR`,
   `CLAUDE_PLUGIN_ROOT`. Check with `grep -roE "env\.[A-Z_]+" scripts/`.
 - **Writes only inside the HQ root** — `status-<domain>.md`, `ideas-inbox.md`, `decisions.md`,
-  `dispatches.md`, `hq.config.json`, `.state/<session-id>.json`, `dashboard.html` — plus the path
-  you pass to `dashboard --html`. Check with `grep -rn "writeFileSync\|mkdirSync" scripts/`.
+  `dispatches.md`, `hq.config.json`, `.state/<session-id>.json`, `dashboard.html`, and on
+  `dashboard --eject` only, `dashboard.css` and `dashboard.template.html` — plus the path you pass
+  to `dashboard --html`. Check with `grep -rn "writeFileSync\|mkdirSync" scripts/`.
 - **Runs external processes only on request:** the command after `--` in `wrap`
   ([scripts/lib/wrap.mjs](scripts/lib/wrap.mjs)); `dashboard` opens the default browser on the page
   it writes, unless `--no-open` ([scripts/lib/dashboard.mjs](scripts/lib/dashboard.mjs)); `leak-check`
   also shells out to `git ls-files`.
-- **106 tests**, no network and no committed fixtures: `node --test`.
+- **129 tests**, no network and no committed fixtures: `node --test`.
 - [Security notes](docs/security.md): threat model, trust boundary, reporting.
 
 ## Non-goals, stated in the README
@@ -69,12 +73,13 @@ requiring config-file literacy up front.
 - [docs/design.md](docs/design.md) — the argument, the tradeoffs, and what is deliberately absent
 - [docs/adapters.md](docs/adapters.md) — what each adapter guarantees, and how to write one
 - [docs/config.md](docs/config.md) — every configuration key, profiles, `wrap` and `dashboard`
+- [docs/dashboard.md](docs/dashboard.md) — themes, the `dashboard` config block, labels, template slots
 - [docs/case-studies.md](docs/case-studies.md) — three fictionalised failure modes
 - [skills/hq-protocol/SKILL.md](skills/hq-protocol/SKILL.md) — what a good status entry contains
 
 ## How to verify the repo
 
-- `node --test` — 106 tests
+- `node --test` — 129 tests
 - `claude plugin validate . --strict` and `claude plugin validate .claude-plugin/plugin.json --strict`
 - `node scripts/leak-check.mjs --denylist .github/leak-denylist.example.txt` — credential-shaped
   pattern scan over tracked files
