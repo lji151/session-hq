@@ -15,6 +15,10 @@ export function relTime(hours) {
   if (hours < 48) return `${Math.round(hours)}h ago`;
   return `${Math.round(hours / 24)}d ago`;
 }
+/** `YYYY-MM-DD HH:MM UTC` — what every renderer shows for "generated". */
+export function formatGeneratedAt(date) {
+  return `${date.toISOString().replace('T', ' ').slice(0, 16)} UTC`;
+}
 export function collectDashboard(config, hqRoot, staleAfterHours) {
   const rows = (config.domains || []).map((d) => summariseDomain(hqRoot, safeSlug(d), staleAfterHours));
   const inboxFile = path.join(hqRoot, config.inbox?.file || 'ideas-inbox.md');
@@ -32,20 +36,38 @@ export function collectDashboard(config, hqRoot, staleAfterHours) {
     decisions: lastEntries(decisionsFile, 3),
   };
 }
-/** Count `- ` list entries, ignoring the explanatory header of the file. */
+// A dated bullet: "- 2026-01-28 | ..." or "- **2026-01-28 | ...**", the date
+// optionally followed by more text (a time, a tag) before the "|". Bold is
+// common in hand-written entries and must not make a line invisible to this.
+const DATED_LINE_RE = /^-\s+\*{0,2}(\d{4}-\d{2}-\d{2})/;
+
+/** Count dated bullets, ignoring the explanatory header of the file. */
 function countEntries(file) {
   if (!isFile(file)) return 0;
   return fs.readFileSync(file, 'utf8')
     .split(/\r?\n/)
-    .filter((l) => /^-\s+\d{4}-\d{2}-\d{2}\s*\|/.test(l))
+    .filter((l) => DATED_LINE_RE.test(l))
     .length;
 }
+/**
+ * The last `n` dated bullets, newest last (the file's own append-only
+ * convention). A file that is genuinely append-only sorts by date the same
+ * way it sorts by position, so this is "last n in file order"; sorting by
+ * the leading date is what makes it correct even when it isn't — a line
+ * edited in place, or moved — rather than just trusting file order blindly.
+ */
 function lastEntries(file, n) {
   if (!isFile(file)) return [];
-  const lines = fs.readFileSync(file, 'utf8')
-    .split(/\r?\n/)
-    .filter((l) => /^-\s+\d{4}-\d{2}-\d{2}\s*\|/.test(l));
-  return lines.slice(-n);
+  const candidates = [];
+  fs.readFileSync(file, 'utf8').split(/\r?\n/).forEach((line, index) => {
+    const m = line.match(DATED_LINE_RE);
+    if (m) candidates.push({ line, index, date: m[1] });
+  });
+  const newestFirst = [...candidates].sort((a, b) =>
+    b.date === a.date ? b.index - a.index : b.date.localeCompare(a.date));
+  return newestFirst.slice(0, n)
+    .sort((a, b) => a.index - b.index)
+    .map((c) => c.line);
 }
 
 /* ---------------------------------------------------------------- terminal */
@@ -61,7 +83,7 @@ function padLeft(s, width) {
 export function renderTerminal(d) {
   const out = [];
   out.push(`session-hq dashboard — ${d.hqRoot}`);
-  out.push(`${d.rows.length} domain${d.rows.length === 1 ? '' : 's'} · stale after ${d.staleAfterHours}h · generated ${d.generatedAt.toISOString().replace('T', ' ').slice(0, 16)} UTC`);
+  out.push(`${d.rows.length} domain${d.rows.length === 1 ? '' : 's'} · stale after ${d.staleAfterHours}h · generated ${formatGeneratedAt(d.generatedAt)}`);
   out.push('');
 
   const cells = d.rows.map((r) => [
@@ -119,7 +141,7 @@ export function renderMarkdown(d) {
   const out = [];
   out.push('# session-hq dashboard');
   out.push('');
-  out.push(`\`${d.hqRoot}\` · ${d.rows.length} domains · stale after ${d.staleAfterHours}h · generated ${d.generatedAt.toISOString()}`);
+  out.push(`\`${d.hqRoot}\` · ${d.rows.length} domains · stale after ${d.staleAfterHours}h · generated ${formatGeneratedAt(d.generatedAt)}`);
   out.push('');
   out.push('| Domain | Last updated | Workstreams | Blocked | Next | Asked |');
   out.push('|---|---|---:|---:|---:|---:|');
@@ -187,8 +209,8 @@ export function renderHtml(d, { watchSeconds = null } = {}) {
 
   const refreshMeta = watchSeconds ? `\n<meta http-equiv="refresh" content="${watchSeconds}">` : '';
   const footer = watchSeconds
-    ? `Auto-refreshing every ${watchSeconds}s &middot; generated ${esc(d.generatedAt.toISOString())}.`
-    : `Generated ${esc(d.generatedAt.toISOString())} &middot; run <code>hq dashboard</code> again, or <code>--watch</code>, to refresh.`;
+    ? `Auto-refreshing every ${watchSeconds}s &middot; generated ${esc(formatGeneratedAt(d.generatedAt))}.`
+    : `Generated ${esc(formatGeneratedAt(d.generatedAt))} &middot; run <code>hq dashboard</code> again, or <code>--watch</code>, to refresh.`;
 
   return `<!doctype html>
 <html lang="en">
@@ -229,7 +251,7 @@ export function renderHtml(d, { watchSeconds = null } = {}) {
 </style>
 <main>
   <h1>session-hq dashboard</h1>
-  <p class="meta">${esc(d.hqRoot)} &middot; ${d.rows.length} domains &middot; stale after ${d.staleAfterHours}h &middot; generated ${esc(d.generatedAt.toISOString())}</p>
+  <p class="meta">${esc(d.hqRoot)} &middot; ${d.rows.length} domains &middot; stale after ${d.staleAfterHours}h &middot; generated ${esc(formatGeneratedAt(d.generatedAt))}</p>
 
   <h2>Stale (over ${d.staleAfterHours}h)</h2>
   ${list(d.stale.map((r) => `<li><span class="dom">${esc(r.domain)}</span> &mdash; ${esc(relTime(r.ageHours))}</li>`), 'Nothing stale.')}

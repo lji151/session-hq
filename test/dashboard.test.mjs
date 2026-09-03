@@ -236,3 +236,69 @@ describe('the page, opened for you (default view)', () => {
     assert.match(html, /<meta http-equiv="refresh" content="1">/);
   });
 });
+
+describe('latest decisions: newest by date, not last regex-matched line', () => {
+  // Reproduces a real HQ's decisions.md: older entries in the plain
+  // "- YYYY-MM-DD | ..." form, newer ones hand-written with bold emphasis and,
+  // sometimes, a time tag before the "|" — both of which used to make a line
+  // invisible to the "latest decisions" picker, so a stale line won a slot a
+  // genuinely newer one should have had.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-hq-decisions-'));
+  before(() => {
+    hq(['init', '--root', dir, '--domains', 'apps'], { HQ_ROOT: dir });
+    fs.appendFileSync(path.join(dir, 'decisions.md'), [
+      '- 2026-08-13 | old plain decision one | apps',
+      '- 2026-08-13 | old plain decision two | apps',
+      '- 2026-08-17 | old plain decision three | apps',
+      '- **2026-09-02 | bold decision, no time** — detail | apps',
+      '- **2026-09-02 13:35 KST | bold decision with a time tag** — detail | apps',
+      '- **2026-09-03 | newest bold decision** — detail | apps',
+      '',
+    ].join('\n'));
+  });
+  after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  test('terminal: the true newest three win, oldest-of-the-three first', () => {
+    const { stdout } = hq(['dashboard', '--terminal'], { HQ_ROOT: dir });
+    assert.match(stdout, /bold decision, no time/);
+    assert.match(stdout, /bold decision with a time tag/);
+    assert.match(stdout, /newest bold decision/);
+    assert.ok(!/old plain decision/.test(stdout),
+      'stale entries that happen to match a stricter pattern must not crowd out real latest ones');
+
+    const noTimeAt = stdout.indexOf('bold decision, no time');
+    const withTimeAt = stdout.indexOf('bold decision with a time tag');
+    const newestAt = stdout.indexOf('newest bold decision');
+    assert.ok(noTimeAt < withTimeAt && withTimeAt < newestAt, 'oldest of the three first, newest last');
+  });
+
+  test('markdown and html agree with the terminal view (same helper)', () => {
+    const md = hq(['dashboard', '--md'], { HQ_ROOT: dir }).stdout;
+    assert.match(md, /newest bold decision/);
+    assert.ok(!/old plain decision/.test(md));
+
+    const out = path.join(dir, 'board.html');
+    hq(['dashboard', '--html', out], { HQ_ROOT: dir });
+    const html = fs.readFileSync(out, 'utf8');
+    assert.match(html, /newest bold decision/);
+    assert.ok(!/old plain decision/.test(html));
+  });
+});
+
+describe('generated time is readable, not raw ISO', () => {
+  test('the page header and footer use "YYYY-MM-DD HH:MM UTC", same as the terminal view', () => {
+    const { code } = hq(['dashboard', '--no-open']);
+    assert.equal(code, 0);
+    const html = fs.readFileSync(path.join(ROOT, 'dashboard.html'), 'utf8');
+    const readable = /\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/;
+    assert.match(html, readable, 'header meta line');
+    assert.match(html.split('<footer>')[1] || '', readable, 'footer');
+    assert.ok(!/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/.test(html), 'no raw ISO timestamp anywhere on the page');
+  });
+
+  test('markdown uses the same readable form', () => {
+    const md = hq(['dashboard', '--md']).stdout;
+    assert.match(md, /\d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/);
+    assert.ok(!/\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z/.test(md));
+  });
+});
