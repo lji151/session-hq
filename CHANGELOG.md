@@ -42,7 +42,12 @@ Initial release.
   `leak-check`.
 - **`scripts/leak-check.mjs`** — scans tracked files against an out-of-repo denylist and exits 1
   on any hit, so personal data cannot be published by accident.
-- **Templates** for the HQ files, the memory layer, and subagent briefs.
+- **Orchestrator session.** A session whose domain is `orchestrator.domain` (`hq` by default, or
+  `HQ_DOMAIN=all`) is injected with the whole HQ — the dashboard in markdown plus its own
+  `status-hq.md` — instead of a single status file. For that seat, a write to either its own file
+  or `decisions.md` counts as reporting back. Because the record is on disk rather than in a
+  transcript, department sessions can be closed and reopened freely.
+- **Templates** for the HQ files, the orchestrator seat, the memory layer, and subagent briefs.
 - **Recipes** for a chat notifier, multi-shot deadline reminders across three schedulers, a
   conversation archiver, and screen capture.
 - **Docs**: an adapter matrix with a "writing an adapter" guide, design and tradeoffs, a full

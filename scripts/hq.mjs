@@ -36,6 +36,7 @@ export const DEFAULT_CONFIG = {
   defaultDomain: null,
   inject: { on: 'session-start', maxLines: 60, staleAfterHours: 48 },
   update: { mode: 'on-stop', everyNTools: 0, minMinutesBetween: 20, enforce: false },
+  orchestrator: { domain: 'hq', injectDashboard: true, maxLines: 80 },
   inbox: { file: 'ideas-inbox.md' },
   decisions: { file: 'decisions.md' },
   language: 'en',
@@ -159,6 +160,12 @@ export function validateConfig(config) {
   }
   if (typeof config.update?.minMinutesBetween !== 'number' || config.update.minMinutesBetween < 0) errors.push('update.minMinutesBetween must be a non-negative number');
   if (typeof config.update?.enforce !== 'boolean') errors.push('update.enforce must be a boolean');
+  if (!config.orchestrator?.domain) errors.push('orchestrator.domain is required');
+  if (typeof config.orchestrator?.injectDashboard !== 'boolean') errors.push('orchestrator.injectDashboard must be a boolean');
+  if (!Number.isInteger(config.orchestrator?.maxLines) || config.orchestrator.maxLines < 1) errors.push('orchestrator.maxLines must be a positive integer');
+  if (Array.isArray(config.domains) && config.domains.map(safeSlug).includes(safeSlug(config.orchestrator?.domain))) {
+    warnings.push('orchestrator.domain is also listed in domains; it is a seat, not a department, and will appear as a dashboard row');
+  }
   if (!config.inbox?.file) errors.push('inbox.file is required');
   if (!config.decisions?.file) errors.push('decisions.file is required');
   return { errors, warnings };
@@ -302,6 +309,11 @@ function cmdInit(flags) {
   for (const d of domains) {
     files.push([`status-${d}.md`, 'status-domain.md', { DOMAIN: d, DATE: todayIso(), STAMP: nowIso() }]);
   }
+  // The orchestrator seat is not a department, so it is not in `domains` and gets its own file.
+  const seat = safeSlug(config.orchestrator.domain);
+  if (seat && !domains.includes(seat)) {
+    files.push([`status-${seat}.md`, 'status-orchestrator.md', { DOMAIN: seat, DATE: todayIso(), STAMP: nowIso() }]);
+  }
 
   for (const [dest, tpl, vars] of files) {
     const out = path.join(root, dest);
@@ -340,16 +352,23 @@ function cmdInject(flags) {
 
   const domain = resolveDomain({ config, explicit: typeof flags.domain === 'string' ? flags.domain : null });
   const adapter = printMode ? 'cli' : 'hooks';
-  const body = domain
-    ? buildDomainContext({ config, hqRoot, domain, adapter })
-    : buildIndexContext({ config, hqRoot, adapter });
+  const body = !domain
+    ? buildIndexContext({ config, hqRoot, adapter })
+    : isOrchestratorDomain(domain, config)
+      ? buildOrchestratorContext({ config, hqRoot, domain, adapter })
+      : buildDomainContext({ config, hqRoot, domain, adapter });
 
   // Record session state so `update-check` can tell whether anything changed.
   if (hook.session_id) {
-    const file = domain ? statusPath(hqRoot, domain) : null;
+    const owner = domain ? accountableDomain(domain, config) : null;
+    const file = owner ? statusPath(hqRoot, owner) : null;
     writeJson(statePath(hqRoot, hook.session_id), {
       sessionId: hook.session_id,
-      domain,
+      domain: owner,
+      orchestrator: domain ? isOrchestratorDomain(domain, config) : false,
+      decisionsHashAtStart: domain && isOrchestratorDomain(domain, config)
+        ? hashFile(path.join(hqRoot, config.decisions.file))
+        : null,
       startedAt: nowIso(),
       toolCalls: 0,
       lastNudgeAt: null,
@@ -440,6 +459,57 @@ function buildIndexContext({ config, hqRoot, adapter = 'hooks' }) {
   return lines.join('\n');
 }
 
+/* ------------------------------------------------------- orchestrator seat */
+
+/**
+ * The CEO seat can be a person reading `dashboard`, or a session.
+ * A session whose domain is `orchestrator.domain` (or the literal `all`) is
+ * given the whole HQ instead of one status file.
+ */
+/** The status file a session is accountable for. The seat owns `status-<seat>.md`. */
+export function accountableDomain(domain, config) {
+  return isOrchestratorDomain(domain, config) ? safeSlug(config.orchestrator?.domain || 'hq') : domain;
+}
+
+export function isOrchestratorDomain(domain, config) {
+  if (!domain) return false;
+  const seat = safeSlug(config.orchestrator?.domain || 'hq');
+  return domain === seat || domain === 'all';
+}
+
+function buildOrchestratorContext({ config, hqRoot, domain, adapter = 'hooks' }) {
+  const seat = safeSlug(config.orchestrator?.domain || 'hq');
+  const maxLines = config.orchestrator?.maxLines || 80;
+  const out = [
+    '## session-hq — orchestrator session',
+    '',
+    `You are the coordinating session. HQ root: \`${hqRoot}\`.`,
+    'You hold the whole picture. The department sessions hold their own areas and know them',
+    'better than you do. Read this, then dispatch, review, and record — do not do their work.',
+    '',
+  ];
+
+  if (config.orchestrator?.injectDashboard !== false) {
+    const data = collectDashboard(config, hqRoot, config.inject.staleAfterHours);
+    out.push(trimToLines(renderMarkdown(data), maxLines));
+    out.push('');
+  }
+
+  const own = statusPath(hqRoot, seat);
+  if (isFile(own)) {
+    out.push('---', '', `### Your own notes (\`${path.basename(own)}\`)`, '');
+    out.push(trimToLines(fs.readFileSync(own, 'utf8'), maxLines));
+    out.push('');
+  }
+
+  out.push('---', '');
+  out.push(adapter === 'hooks'
+    ? 'Record decisions with `/hq-decide`, and keep your own file current with `/hq-update`.'
+    : `Record decisions with \`${cliCmd('decide "<line>"')}\`, and edit \`${path.basename(own)}\` directly.`);
+  out.push('A write to either your own status file or the decision log counts as reporting back.');
+  return out.join('\n');
+}
+
 /* ------------------------------------------------------------- cmd:remind */
 
 function cmdRemind() {
@@ -453,7 +523,7 @@ function cmdRemind() {
   const sp = statePath(hqRoot, hook.session_id);
   // The counter is maintained in every non-manual mode: `on-stop` needs it to tell
   // "this session did nothing" from "this session did work and wrote nothing back".
-  const domain = resolveDomain({ config });
+  const domain = accountableDomain(resolveDomain({ config }), config);
   const state = isFile(sp)
     ? safeReadJson(sp)
     : {
@@ -522,6 +592,11 @@ function cmdUpdateCheck(flags = {}) {
   const file = statusPath(hqRoot, state.domain);
   const now = hashFile(file);
   if (now && now !== state.statusHashAtStart) return;  // Already updated. Nothing to say.
+  if (state.orchestrator) {
+    // The seat reports by recording a decision just as much as by writing its own notes.
+    const decisions = hashFile(path.join(hqRoot, config.decisions.file));
+    if (decisions && decisions !== state.decisionsHashAtStart) return;
+  }
 
   state.remindedAt = nowIso();
   writeJson(sp, state);
@@ -1154,9 +1229,11 @@ function cmdWrap(rawArgs) {
   const domain = resolveDomain({ config, explicit: typeof flags.domain === 'string' ? flags.domain : null });
 
   if (!flags.quiet) {
-    console.log(domain
-      ? buildDomainContext({ config, hqRoot, domain, adapter: 'cli' })
-      : buildIndexContext({ config, hqRoot, adapter: 'cli' }));
+    console.log(!domain
+      ? buildIndexContext({ config, hqRoot, adapter: 'cli' })
+      : isOrchestratorDomain(domain, config)
+        ? buildOrchestratorContext({ config, hqRoot, domain, adapter: 'cli' })
+        : buildDomainContext({ config, hqRoot, domain, adapter: 'cli' }));
     console.log('');
   }
 

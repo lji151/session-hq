@@ -91,6 +91,56 @@ mean wrong — it means unverified.
 - **Archive, do not hoard.** When a workstream is genuinely finished, collapse it to one line or
   move it out. A status file nobody wants to read is a status file nobody reads.
 
+## The orchestrator session
+
+The CEO seat can be a person reading `hq.mjs dashboard`, or it can be a session. An **orchestrator
+session** is one session whose domain is `orchestrator.domain` (`hq` by default; `HQ_DOMAIN=all`
+works too). Instead of one status file it is given the whole HQ — the dashboard in markdown, then
+its own `status-hq.md`.
+
+Its job is four things, and department work is not one of them:
+
+1. **Read everything.** It starts each session with the dashboard: what is stale, what is blocked,
+   what nobody has touched.
+2. **Hand work to the domain that owns it.** The durable way is to write a `Next:` line into that
+   domain's status file, so the request is waiting whenever that session next opens. If the harness
+   exposes cross-session messaging and that domain's session is alive, a message is a fine way to
+   get someone's attention *as well* — but it is never the record. Messages are ephemeral; the file
+   is not.
+3. **Record decisions** in `decisions.md` as they are made, not afterwards from memory.
+4. **Review before reporting to the human.** Check the specifics — do the paths exist, do the
+   numbers appear in the output, was it verified or asserted. A department report forwarded
+   unchecked is worse than no report, because it will be believed.
+
+**What it must not do** is department work. The moment the orchestrator starts editing a
+department's code, it acquires that department's context, and the seat is gone — that is the
+one-session model again, wearing a hat.
+
+### Why this makes sessions disposable
+
+The record lives in the HQ, not in any session's transcript. So a department session can be closed
+the moment its work is written back, and nothing is lost: the orchestrator never read that session,
+it read the file. Close them freely, reopen when there is something to do, and let compaction take
+whatever it wants — the part that mattered is on disk.
+
+### Reporting back
+
+For an orchestrator session, a write to **either** `status-hq.md` **or** `decisions.md` counts as
+reporting back, because on many days its entire output is a decision.
+
+### Not the same thing as orchestrator-routing
+
+Two different scopes, and it is worth keeping them apart:
+
+- [`orchestrator-routing`](../orchestrator-routing/SKILL.md) is about **model tiers inside one
+  session** — a coordinator writing briefs for coder and researcher subagents, and reviewing what
+  comes back.
+- This is about **sessions**, which are long-lived, own their own context, and are the thing the HQ
+  files describe.
+
+They compose: an orchestrator session delegating to a department session is this page; that
+department session then delegating to subagents is the other one.
+
 ## Commands
 
 | Command | Use |
@@ -99,6 +149,7 @@ mean wrong — it means unverified.
 | `/hq-update [domain]` | write this session's outcome back |
 | `/hq-inbox <idea>` | append one line to the ideas inbox |
 | `/hq-decide <decision>` | append one line to the decision log |
+| `/hq-dashboard` | every domain on one screen: stale, blocked, untouched |
 | `/hq-doctor` | check config, folders, and hook wiring |
 
 ## What does not belong in the HQ

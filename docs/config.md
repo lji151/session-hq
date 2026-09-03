@@ -43,6 +43,7 @@ That second rule is what lets you drop a config file into a folder and have it j
   "defaultDomain": null,
   "inject":    { "on": "session-start", "maxLines": 60, "staleAfterHours": 48 },
   "update":    { "mode": "on-stop", "everyNTools": 0, "minMinutesBetween": 20, "enforce": false },
+  "orchestrator": { "domain": "hq", "injectDashboard": true, "maxLines": 80 },
   "inbox":     { "file": "ideas-inbox.md" },
   "decisions": { "file": "decisions.md" },
   "language":  "en"
@@ -171,6 +172,30 @@ Two safeguards apply in both cases: a session that made no tool calls is never r
 re-entering Stop hook (`stop_hook_active`) is ignored so enforcement cannot loop.
 
 ---
+
+### `orchestrator`
+
+```json
+"orchestrator": { "domain": "hq", "injectDashboard": true, "maxLines": 80 }
+```
+
+The CEO seat as a session. A session whose domain equals `orchestrator.domain` — or the literal
+`all` — is injected with the whole HQ instead of one status file: the dashboard as markdown,
+trimmed to `orchestrator.maxLines`, then its own `status-<domain>.md`.
+
+| Key | Default | Effect |
+|---|---|---|
+| `domain` | `"hq"` | The seat's name. `hq init` creates `status-hq.md` from the orchestrator template. |
+| `injectDashboard` | `true` | Set `false` to give the seat only its own notes, for a very small context window. |
+| `maxLines` | `80` | Trim applied to the dashboard and to the seat's own file. |
+
+The seat is **not** a department, so keep it out of `domains` — `doctor` warns if it is there,
+because it would then appear as a dashboard row reporting on itself.
+
+Accounting differs in one way: for a seat session, a write to **either** `status-hq.md` **or**
+`decisions.md` counts as reporting back, since on many days the seat's entire output is a decision.
+
+`wrap --domain hq` gives a non-Claude agent the same view.
 
 ### `inbox.file` / `decisions.file`
 

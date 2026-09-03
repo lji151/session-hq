@@ -266,6 +266,41 @@ LATEST DECISIONS
 `--md` gives the same picture as markdown. `--html <file>` writes a self-contained page — inline
 CSS, no scripts, no network — to keep open on a second monitor. Under Claude Code, `/hq-dashboard`.
 
+### Two ways to sit in the CEO seat
+
+**You look.** Run `hq.mjs dashboard` — or `/hq-dashboard` — whenever you want the picture. Optional,
+on demand, no session required.
+
+**Or an agent looks, all day.** An *orchestrator session* is one session whose domain is
+`orchestrator.domain` (`hq` by default). It is injected with the whole HQ rather than one status
+file, and its job is to know what every department did, hand out work, record decisions, and review
+results before they reach you.
+
+```console
+$ HQ_DOMAIN=hq claude
+──────────────────────────────────────────────────────────────────────────────
+## session-hq — orchestrator session
+
+| Domain   | Last updated | Workstreams | Blocked | Next |
+| video    | 6d ago STALE |           3 |       1 |    3 |
+| apps     | 3h ago       |           4 |       1 |    4 |
+| business | just now     |           0 |       0 |    0 |
+──────────────────────────────────────────────────────────────────────────────
+
+> what needs me today
+
+Two things. **business** has no workstreams at all — it was set up and never
+used, so either close it or tell me what belongs there. And **video** has been
+silent six days with a support ticket open; I have written the follow-up into
+its Next line so that session picks it up whenever it next opens.
+
+Everything else is moving. apps shipped the export on Thursday.
+```
+
+The property that makes this work: **close any department session and nothing is lost.** The
+orchestrator never read that session — it read the file the session wrote. Sessions become
+disposable; the record does not.
+
 ## Configure the cadence
 
 Nagging that does not fit how you work gets turned off, and then the whole thing rots. So the
