@@ -213,6 +213,42 @@ Language hint for generated templates and prose. It does not change the CLI's ow
 
 ---
 
+## Dispatches
+
+`<hqRoot>/dispatches.md` is work handed from one seat to a department, and the result handed back.
+Append-only, one line each, and readable without any of this tooling:
+
+```
+- [ ] d-4f0c21 · 2026-02-04 · hq → video · !high · re-render the intro with the fixed logo
+- [x] d-4f0c21 · 2026-02-04 · hq → video · re-render the intro ↳ done 2026-02-05: shipped · acked 2026-02-06
+```
+
+| Command | Does |
+|---|---|
+| `dispatch --to <domain> [--from <d>] [--priority <p>] "<task>"` | Append an open dispatch; prints the id. `--from` defaults to `orchestrator.domain`. |
+| `done <id> [--note "<line>"]` | Mark it done with a one-line result. It moves to the review queue. |
+| `ack <id>` | Reviewed and closed. Refuses on a dispatch that is not done. |
+| `dispatches [--domain d] [--open\|--awaiting-review\|--all]` | List. `--open` is the default. |
+
+How it shows up elsewhere:
+
+- **The target domain's injection** leads with an `HQ asked you to:` block listing its open
+  dispatches, before its own status file. Nothing is printed when there are none.
+- **`update-check`** treats a change to `dispatches.md` as writing back, so a session that reported
+  a dispatched task finished is not also nagged about its status file.
+- **The dashboard** gains an `ASKED` column (open dispatches per domain) and an **Awaiting review**
+  list — done but not acked. That list is the orchestrator's queue, and it appears in the seat's
+  injection too.
+
+Two things worth being explicit about:
+
+- **The file is the channel.** A dispatch works whether or not the target session is running, which
+  is the point: most of the time it is not. Where a harness offers live cross-session messaging, a
+  message pointing at a dispatch id is a fine way to get attention sooner, but delivery and
+  permissions are the harness's business and a message leaves no record. This tool guarantees only
+  that the request and the result are on disk.
+- **Examples in fenced code blocks are not parsed**, so the file can document its own format.
+
 ## The dashboard
 
 ```bash

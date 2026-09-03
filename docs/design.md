@@ -132,6 +132,30 @@ The plugin never writes status content itself. It creates the file, injects it, 
 goes in comes from `/hq-update`, run by a session that actually did the work. An invented status
 entry is worse than a missing one, because it will be believed.
 
+## Dispatch, and why it is a file
+
+The third use is running the departments from one seat: the human tells the orchestrator, the
+orchestrator tells the department, the department reports back, the orchestrator reviews.
+
+The obvious implementation is messaging — find the live session for that domain and send it the
+task. That fails on the common case. Most of the time the target session is not running: it was
+closed yesterday when its work was written back, which is exactly the property that makes sessions
+disposable. A channel that only works while both ends are alive cannot carry a request across that
+gap, and a message that is not delivered leaves nothing behind to notice later.
+
+So a dispatch is a line in `dispatches.md`, and the department is told about it at *its* next
+session start, whenever that is. The queue is durable, inspectable, and survives everything —
+closing sessions, restarting the machine, losing the tooling entirely.
+
+Live messaging still helps, and the protocol says so: where a harness offers it, a message pointing
+at a dispatch id gets attention sooner. It is a notification, never the record. Whether such a
+message can be sent or received at all is the harness's business, and this project makes no claims
+about it — the guarantee is only that the request and the result are on disk.
+
+The review step (`ack`) exists for the same reason the orchestrator-routing skill insists on it:
+delegation without review is not delegation. `done` and `ack` are separate states precisely so that
+"a department said it was finished" and "someone checked" cannot be confused.
+
 ## Tradeoffs
 
 ### Files, not a database

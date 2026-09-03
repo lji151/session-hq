@@ -11,6 +11,10 @@
  *   node hq.mjs update-check   [--domain d]     (Stop hook, or a manual report from a shell)
  *   node hq.mjs inbox         <text...>       [--domain d]
  *   node hq.mjs decide        <text...>       [--domain d]
+ *   node hq.mjs dispatch      --to <domain> [--from d] [--priority p] "<task>"
+ *   node hq.mjs done          <id> [--note "<line>"]
+ *   node hq.mjs ack           <id>
+ *   node hq.mjs dispatches    [--domain d] [--open|--awaiting-review|--all]
  *   node hq.mjs dashboard     [--stale-hours N] [--md | --html <file>]
  *   node hq.mjs doctor        [--json]
  *   node hq.mjs memory-lint   [--dir <dir>] [--json]
@@ -305,6 +309,7 @@ function cmdInit(flags) {
     ['README.md', 'HQ-README.md', { DOMAIN_TABLE: domainTable, DATE: todayIso(), HQ_ROOT: root }],
     [config.inbox.file, 'ideas-inbox.md', { DATE: todayIso() }],
     [config.decisions.file, 'decisions.md', { DATE: todayIso() }],
+    [DISPATCH_FILE, 'dispatches.md', { DATE: todayIso() }],
   ];
   for (const d of domains) {
     files.push([`status-${d}.md`, 'status-domain.md', { DOMAIN: d, DATE: todayIso(), STAMP: nowIso() }]);
@@ -374,6 +379,7 @@ function cmdInject(flags) {
       lastNudgeAt: null,
       remindedAt: null,
       statusHashAtStart: file ? hashFile(file) : null,
+      dispatchesHashAtStart: hashFile(dispatchPath(hqRoot)),
       hqRoot,
     });
   }
@@ -404,6 +410,10 @@ function buildDomainContext({ config, hqRoot, domain, adapter = 'hooks' }) {
     '',
     `Domain: **${domain}**   ·   HQ root: \`${hqRoot}\``,
   ];
+  // Anything HQ handed this domain comes before its own notes.
+  const asked = dispatchBlock(hqRoot, domain);
+  if (asked) head.push('', asked);
+
   if (!isFile(file)) {
     head.push('', adapter === 'hooks'
       ? `No status file yet at \`${path.basename(file)}\`. Run \`/hq-update ${domain}\` at the end of this session to create one.`
@@ -456,6 +466,242 @@ function buildIndexContext({ config, hqRoot, adapter = 'hooks' }) {
     ? 'Pick one with `/hq-status <domain>` before doing project work, or set `HQ_DOMAIN`'
     : 'Pass `--domain <domain>` before doing project work, or set `HQ_DOMAIN`',
     'in the environment / `defaultDomain` in `hq.config.json` so it happens automatically.');
+  return lines.join('\n');
+}
+
+/* ---------------------------------------------------------------- dispatch */
+
+const DISPATCH_FILE = 'dispatches.md';
+
+/**
+ * One line per dispatch, append-only, human-readable and human-editable:
+ *
+ *   - [ ] d-a1b2c3 · 2026-02-04 · hq -> video · !high · re-render the intro
+ *   - [x] d-a1b2c3 · 2026-02-04 · hq -> video · re-render the intro ^ done 2026-02-05: shipped
+ *   ... with " · acked 2026-02-06" appended once the orchestrator has reviewed it.
+ *
+ * The separators are written as the middle dot and the arrows below; the regex
+ * accepts the ASCII forms too, because people edit this file by hand.
+ */
+const SEP = ' · ';
+const ARROW = '→';        // ->
+const DONE_MARK = '↳';    // downwards arrow with tip rightwards
+
+const DISPATCH_RE = new RegExp(
+  '^- \\[( |x)\\]\\s*' +
+  '(d-[0-9a-f]{6})\\s*[·|]\\s*' +
+  '(\\d{4}-\\d{2}-\\d{2})\\s*[·|]\\s*' +
+  '([a-z0-9._-]+)\\s*(?:→|->)\\s*([a-z0-9._-]+)\\s*[·|]\\s*' +
+  '(.*)$'
+);
+
+export function dispatchPath(hqRoot) {
+  return path.join(hqRoot, DISPATCH_FILE);
+}
+
+export function parseDispatches(text) {
+  const out = [];
+  let inFence = false;
+  for (const line of String(text).split(/\r?\n/)) {
+    // The file documents its own format in a fenced block. Those are examples,
+    // not dispatches, and parsing them would inject a fictional task.
+    if (/^\s*(```|~~~)/.test(line)) { inFence = !inFence; continue; }
+    if (inFence) continue;
+    const m = line.match(DISPATCH_RE);
+    if (!m) continue;
+    const [, mark, id, date, from, to] = m;
+    let rest = m[6];
+
+    let acked = null;
+    const ack = rest.match(/\s*[·|]\s*acked\s+(\d{4}-\d{2}-\d{2})\s*$/);
+    if (ack) { acked = ack[1]; rest = rest.slice(0, ack.index); }
+
+    let done = null;
+    const d = rest.match(/\s*(?:↳|->>|=>)\s*done\s+(\d{4}-\d{2}-\d{2})\s*:?\s*(.*)$/);
+    if (d) { done = { date: d[1], note: d[2].trim() }; rest = rest.slice(0, d.index); }
+
+    let priority = null;
+    const pr = rest.match(/^!\s*([a-z]+)\s*[·|]\s*/i);
+    if (pr) { priority = pr[1].toLowerCase(); rest = rest.slice(pr[0].length); }
+
+    out.push({
+      id, date, from, to, priority,
+      text: rest.trim(),
+      done: mark === 'x' ? (done || { date: null, note: '' }) : null,
+      acked,
+      line,
+    });
+  }
+  return out;
+}
+
+export function readDispatches(hqRoot) {
+  const file = dispatchPath(hqRoot);
+  return isFile(file) ? parseDispatches(fs.readFileSync(file, 'utf8')) : [];
+}
+
+export function openDispatchesFor(hqRoot, domain) {
+  const d = safeSlug(domain);
+  return readDispatches(hqRoot).filter((x) => x.to === d && !x.done);
+}
+
+export function awaitingReview(hqRoot) {
+  return readDispatches(hqRoot).filter((x) => x.done && !x.acked);
+}
+
+function serialise(d) {
+  const head = `- [${d.done ? 'x' : ' '}] ${d.id}${SEP}${d.date}${SEP}${d.from} ${ARROW} ${d.to}${SEP}`;
+  const body = (d.priority ? `!${d.priority}${SEP}` : '') + d.text;
+  const done = d.done ? ` ${DONE_MARK} done ${d.done.date}: ${d.done.note}` : '';
+  const ack = d.acked ? `${SEP}acked ${d.acked}` : '';
+  return head + body + done + ack;
+}
+
+function ensureDispatchFile(hqRoot) {
+  const file = dispatchPath(hqRoot);
+  if (!isFile(file)) {
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.writeFileSync(file, renderTemplate('dispatches.md', { DATE: todayIso() }), 'utf8');
+  }
+  return file;
+}
+
+/** Rewrite one dispatch line in place, leaving every other byte of the file alone. */
+function replaceDispatchLine(hqRoot, id, transform) {
+  const file = ensureDispatchFile(hqRoot);
+  const lines = fs.readFileSync(file, 'utf8').split(/\r?\n/);
+  let found = null;
+  for (let i = 0; i < lines.length; i++) {
+    const parsed = parseDispatches(lines[i])[0];
+    if (parsed && parsed.id === id) {
+      found = transform(parsed);
+      if (found === null) return { file, dispatch: parsed, changed: false };
+      lines[i] = serialise(found);
+      fs.writeFileSync(file, lines.join('\n'), 'utf8');
+      return { file, dispatch: found, changed: true };
+    }
+  }
+  return { file, dispatch: null, changed: false };
+}
+
+function cmdDispatch(flags, positional) {
+  const text = positional.join(' ').trim();
+  const found = discoverConfig();
+  if (!found) {
+    console.error('hq: no hq.config.json found. Run `hq.mjs init` first.');
+    process.exitCode = 1;
+    return;
+  }
+  const { config, hqRoot } = found;
+  const to = safeSlug(typeof flags.to === 'string' ? flags.to : '');
+  if (!to || !text) {
+    console.error('usage: hq.mjs dispatch --to <domain> [--from <domain>] [--priority high] "<task>"');
+    process.exitCode = 1;
+    return;
+  }
+  const known = (config.domains || []).map(safeSlug);
+  if (!known.includes(to) && !isOrchestratorDomain(to, config)) {
+    console.error(`hq dispatch: "${to}" is not a known domain (${known.join(', ')})`);
+    process.exitCode = 1;
+    return;
+  }
+
+  const from = safeSlug(typeof flags.from === 'string' ? flags.from : (config.orchestrator?.domain || 'hq'));
+  const d = {
+    id: `d-${crypto.randomBytes(3).toString('hex')}`,
+    date: todayIso(),
+    from,
+    to,
+    priority: typeof flags.priority === 'string' ? safeSlug(flags.priority) : null,
+    text: text.replace(/\s*\n\s*/g, ' '),
+    done: null,
+    acked: null,
+  };
+
+  const file = ensureDispatchFile(hqRoot);
+  fs.writeFileSync(file, fs.readFileSync(file, 'utf8').replace(/\s*$/, '\n') + serialise(d) + '\n', 'utf8');
+  console.log(d.id);
+  console.log(`dispatched to ${to}: ${d.text}`);
+  console.log(`  ${file}`);
+}
+
+function cmdDone(flags, positional) {
+  const id = (positional[0] || '').trim();
+  const found = discoverConfig();
+  if (!found || !/^d-[0-9a-f]{6}$/.test(id)) {
+    console.error('usage: hq.mjs done <id> [--note "<one line>"]');
+    process.exitCode = 1;
+    return;
+  }
+  const note = typeof flags.note === 'string' ? flags.note.replace(/\s*\n\s*/g, ' ') : '';
+  const res = replaceDispatchLine(found.hqRoot, id, (d) => {
+    if (d.done) { console.log(`${id} was already done on ${d.done.date}`); return null; }
+    return { ...d, done: { date: todayIso(), note } };
+  });
+  if (!res.dispatch) {
+    console.error(`hq done: no dispatch ${id} in ${res.file}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (res.changed) console.log(`${id} marked done${note ? `: ${note}` : ''}. It is now awaiting review.`);
+}
+
+function cmdAck(flags, positional) {
+  const id = (positional[0] || '').trim();
+  const found = discoverConfig();
+  if (!found || !/^d-[0-9a-f]{6}$/.test(id)) {
+    console.error('usage: hq.mjs ack <id>');
+    process.exitCode = 1;
+    return;
+  }
+  const res = replaceDispatchLine(found.hqRoot, id, (d) => {
+    if (!d.done) { console.error(`hq ack: ${id} is not done yet — review it after the department reports.`); process.exitCode = 1; return null; }
+    if (d.acked) { console.log(`${id} was already acked on ${d.acked}`); return null; }
+    return { ...d, acked: todayIso() };
+  });
+  if (!res.dispatch) {
+    console.error(`hq ack: no dispatch ${id} in ${res.file}`);
+    process.exitCode = 1;
+    return;
+  }
+  if (res.changed) console.log(`${id} reviewed and closed.`);
+}
+
+function cmdDispatches(flags) {
+  const found = discoverConfig();
+  if (!found) {
+    console.error('hq: no hq.config.json found. Run `hq.mjs init` first.');
+    process.exitCode = 1;
+    return;
+  }
+  let list = readDispatches(found.hqRoot);
+  if (typeof flags.domain === 'string') {
+    const d = safeSlug(flags.domain);
+    list = list.filter((x) => x.to === d || x.from === d);
+  }
+  if (flags['awaiting-review']) list = list.filter((x) => x.done && !x.acked);
+  else if (flags.all) { /* everything */ }
+  else list = list.filter((x) => !x.done);   // --open is the default
+
+  if (list.length === 0) { console.log('no dispatches match'); return; }
+  for (const d of list) {
+    const state = d.acked ? 'acked ' : d.done ? 'review' : 'open  ';
+    const pri = d.priority ? ` !${d.priority}` : '';
+    console.log(`${state} ${d.id}  ${d.date}  ${d.from} ${ARROW} ${d.to}${pri}  ${truncate(d.text, 60)}`);
+    if (d.done && d.done.note) console.log(`         done ${d.done.date}: ${truncate(d.done.note, 70)}`);
+  }
+}
+
+/** The "HQ asked you to" block that leads a department session's injection. */
+function dispatchBlock(hqRoot, domain) {
+  const open = openDispatchesFor(hqRoot, domain);
+  if (open.length === 0) return null;
+  const lines = ['### HQ asked you to:', ''];
+  for (const d of open) {
+    lines.push(`- **${d.id}**${d.priority ? ` (${d.priority} priority)` : ''} · dispatched ${d.date} · ${d.text}`);
+  }
+  lines.push('', 'Do these first unless the user says otherwise. When one is finished, record the result:');
+  lines.push('', '    hq.mjs done <id> --note "<one line: what happened>"', '');
   return lines.join('\n');
 }
 
@@ -592,6 +838,9 @@ function cmdUpdateCheck(flags = {}) {
   const file = statusPath(hqRoot, state.domain);
   const now = hashFile(file);
   if (now && now !== state.statusHashAtStart) return;  // Already updated. Nothing to say.
+  // Reporting a dispatched task finished is reporting back.
+  const dispatchHash = hashFile(dispatchPath(hqRoot));
+  if (dispatchHash && state.dispatchesHashAtStart && dispatchHash !== state.dispatchesHashAtStart) return;
   if (state.orchestrator) {
     // The seat reports by recording a decision just as much as by writing its own notes.
     const decisions = hashFile(path.join(hqRoot, config.decisions.file));
@@ -742,6 +991,7 @@ export function summariseDomain(hqRoot, domain, staleAfterHours) {
     workstreams: 0,
     blocked: [],
     nextActions: 0,
+    openDispatches: openDispatchesFor(hqRoot, domain).length,
     untouched: true,
   };
   if (!row.exists) return row;
@@ -784,6 +1034,7 @@ function collectDashboard(config, hqRoot, staleAfterHours) {
     stale: rows.filter((r) => r.stale).sort((a, b) => b.ageHours - a.ageHours),
     blocked: rows.flatMap((r) => r.blocked.map((b) => ({ domain: r.domain, ...b }))),
     untouched: rows.filter((r) => r.untouched),
+    awaiting: awaitingReview(hqRoot),
     inboxCount: countEntries(inboxFile),
     decisions: lastEntries(decisionsFile, 3),
   };
@@ -827,8 +1078,9 @@ function renderTerminal(d) {
     String(r.workstreams),
     String(r.blocked.length),
     String(r.nextActions),
+    String(r.openDispatches),
   ]);
-  const head = ['DOMAIN', 'LAST UPDATED', 'WORK', 'BLOCKED', 'NEXT'];
+  const head = ['DOMAIN', 'LAST UPDATED', 'WORK', 'BLOCKED', 'NEXT', 'ASKED'];
   const widths = head.map((h, i) => Math.max(h.length, ...cells.map((c) => c[i].length)));
 
   // The three count columns read better right-aligned.
@@ -846,6 +1098,14 @@ function renderTerminal(d) {
   out.push('BLOCKED');
   if (d.blocked.length === 0) out.push('  none');
   for (const b of d.blocked) out.push(`  ${b.domain} · ${b.workstream} — ${truncate(b.on, 70)}`);
+  out.push('');
+
+  out.push('AWAITING REVIEW');
+  if (d.awaiting.length === 0) out.push('  none');
+  for (const a of d.awaiting) {
+    out.push(`  ${a.id}  ${a.to} — ${truncate(a.text, 46)}`);
+    if (a.done.note) out.push(`          done ${a.done.date}: ${truncate(a.done.note, 62)}`);
+  }
   out.push('');
 
   out.push('UNTOUCHED');
@@ -872,11 +1132,11 @@ function renderMarkdown(d) {
   out.push('');
   out.push(`\`${d.hqRoot}\` · ${d.rows.length} domains · stale after ${d.staleAfterHours}h · generated ${d.generatedAt.toISOString()}`);
   out.push('');
-  out.push('| Domain | Last updated | Workstreams | Blocked | Next |');
-  out.push('|---|---|---:|---:|---:|');
+  out.push('| Domain | Last updated | Workstreams | Blocked | Next | Asked |');
+  out.push('|---|---|---:|---:|---:|---:|');
   for (const r of d.rows) {
     const when = r.exists ? `${relTime(r.ageHours)}${r.stale ? ' **STALE**' : ''}` : 'no file';
-    out.push(`| ${r.domain} | ${when} | ${r.workstreams} | ${r.blocked.length} | ${r.nextActions} |`);
+    out.push(`| ${r.domain} | ${when} | ${r.workstreams} | ${r.blocked.length} | ${r.nextActions} | ${r.openDispatches} |`);
   }
   out.push('');
   out.push(`## Stale (> ${d.staleAfterHours}h)`);
@@ -888,6 +1148,11 @@ function renderMarkdown(d) {
   out.push('');
   if (d.blocked.length === 0) out.push('None.');
   for (const b of d.blocked) out.push(`- **${b.domain}** · ${b.workstream} — ${truncate(b.on, 160)}`);
+  out.push('');
+  out.push('## Awaiting review');
+  out.push('');
+  if (d.awaiting.length === 0) out.push('None.');
+  for (const a of d.awaiting) out.push(`- \`${a.id}\` **${a.to}** — ${truncate(a.text, 90)}` + (a.done.note ? ` ↳ done ${a.done.date}: ${truncate(a.done.note, 110)}` : ''));
   out.push('');
   out.push('## Untouched');
   out.push('');
@@ -916,7 +1181,7 @@ function renderHtml(d) {
   const rows = d.rows.map((r) => {
     const when = r.exists ? `${relTime(r.ageHours)}${r.stale ? ' <span class="tag">STALE</span>' : ''}` : 'no file';
     return `<tr${r.stale ? ' class="stale"' : ''}><td>${esc(r.domain)}</td><td>${when}</td>` +
-      `<td class="n">${r.workstreams}</td><td class="n">${r.blocked.length}</td><td class="n">${r.nextActions}</td></tr>`;
+      `<td class="n">${r.workstreams}</td><td class="n">${r.blocked.length}</td><td class="n">${r.nextActions}</td><td class="n">${r.openDispatches}</td></tr>`;
   }).join('\n');
 
   const list = (items, empty) => (items.length === 0
@@ -960,7 +1225,7 @@ function renderHtml(d) {
   <p class="meta">${esc(d.hqRoot)} &middot; ${d.rows.length} domains &middot; stale after ${d.staleAfterHours}h &middot; generated ${esc(d.generatedAt.toISOString())}</p>
 
   <table>
-    <thead><tr><th>Domain</th><th>Last updated</th><th class="n">Work</th><th class="n">Blocked</th><th class="n">Next</th></tr></thead>
+    <thead><tr><th>Domain</th><th>Last updated</th><th class="n">Work</th><th class="n">Blocked</th><th class="n">Next</th><th class="n">Asked</th></tr></thead>
     <tbody>
 ${rows}
     </tbody>
@@ -971,6 +1236,9 @@ ${rows}
 
   <h2>Blocked</h2>
   ${list(d.blocked.map((b) => `<li><span class="dom">${esc(b.domain)}</span> &middot; ${esc(b.workstream)} &mdash; ${esc(truncate(b.on, 200))}</li>`), 'Nothing blocked.')}
+
+  <h2>Awaiting review</h2>
+  ${list(d.awaiting.map((a) => `<li><code>${esc(a.id)}</code> <span class="dom">${esc(a.to)}</span> &mdash; ${esc(truncate(a.text, 120))}${a.done.note ? ` &rarr; ${esc(truncate(a.done.note, 140))}` : ''}</li>`), 'Nothing waiting on review.')}
 
   <h2>Untouched</h2>
   ${list(d.untouched.map((r) => `<li><span class="dom">${esc(r.domain)}</span> &mdash; ${r.exists ? 'no workstreams yet' : 'no status file'}</li>`), 'Every domain has work recorded.')}
@@ -1318,6 +1586,10 @@ const USAGE = `session-hq
   hq.mjs wrap          --domain <d> [--quiet] [--expect-update] -- <command> [args...]
   hq.mjs inbox         "<one line>" [--domain d]
   hq.mjs decide        "<one line>" [--domain d]
+  hq.mjs dispatch      --to <domain> [--priority high] "<task>"   hand work to a department
+  hq.mjs done          <id> [--note "<line>"]      report a dispatched task finished
+  hq.mjs ack           <id>                        review and close a finished dispatch
+  hq.mjs dispatches    [--domain d] [--awaiting-review|--all]
   hq.mjs dashboard     [--stale-hours N] [--md | --html <file>]   every domain on one screen
   hq.mjs doctor        [--json]
   hq.mjs memory-lint   [--dir <dir>] [--json]
@@ -1335,6 +1607,10 @@ export async function run(argv) {
     case 'wrap': return cmdWrap(rest);
     case 'inbox': return appendLine('inbox', flags, positional);
     case 'decide': return appendLine('decide', flags, positional);
+    case 'dispatch': return cmdDispatch(flags, positional);
+    case 'done': return cmdDone(flags, positional);
+    case 'ack': return cmdAck(flags, positional);
+    case 'dispatches': return cmdDispatches(flags);
     case 'dashboard': return cmdDashboard(flags);
     case 'doctor': return cmdDoctor(flags);
     case 'memory-lint': return cmdMemoryLint(flags);

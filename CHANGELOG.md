@@ -30,8 +30,13 @@ Initial release.
   blocker and next-action counts, then the three lists that answer "what have I missed" (stale,
   blocked, untouched), the inbox count and the last decisions. `--md`, and `--html <file>` for a
   self-contained page with no scripts or network references.
+- **Dispatch.** `dispatches.md` carries work handed from one seat to a department and the result
+  handed back: `dispatch --to <domain> "<task>"`, `done <id> --note "<result>"`, `ack <id>`, and
+  `dispatches` to list. A domain's open dispatches lead its session injection; reporting one done
+  counts as writing back; the dashboard gains an `ASKED` column and an **Awaiting review** queue.
+  The file is the channel, so a dispatch works when the target session is closed.
 - **Slash commands**: `/hq-init`, `/hq-status`, `/hq-update`, `/hq-inbox`, `/hq-decide`,
-  `/hq-doctor`, `/hq-dashboard`, `/memory-lint`.
+  `/hq-doctor`, `/hq-dashboard`, `/hq-dispatch`, `/hq-done`, `/hq-ack`, `/memory-lint`.
 - **Skills**: `hq-protocol` (when to read and write, what a real status entry contains, why
   negative results are mandatory), `layered-memory` (index to domain index to one fact per file,
   with the frontmatter schema and the Why / How-to-apply format), `orchestrator-routing`

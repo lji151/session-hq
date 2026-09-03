@@ -301,6 +301,39 @@ The property that makes this work: **close any department session and nothing is
 orchestrator never read that session — it read the file the session wrote. Sessions become
 disposable; the record does not.
 
+### Run the departments from one seat
+
+Instead of opening each session and typing into it, tell the orchestrator. It writes the request
+to `dispatches.md`, the department picks it up whenever it next opens, reports a result, and the
+orchestrator reviews.
+
+```console
+$ HQ_DOMAIN=hq claude
+
+> tell the video session to re-render the intro with the fixed logo
+
+Dispatched d-4f0c21 to video (high priority). It is in dispatches.md, so that
+session gets it whenever it next opens — I also pinged the live video session,
+which happens to be running, pointing at the id.
+
+  … next morning …
+
+> anything to review
+
+Yes, one. video finished d-4f0c21: "re-rendered all three cuts, logo correct in
+each; source project committed". I checked the three output files exist with
+today's timestamps. Acking it.
+```
+
+The dispatch on disk is the record; a message to a live session is only a way to get its attention
+sooner. Whether messages can be delivered at all is the harness's business — the HQ guarantees only
+that the request and the result are on disk, which is what makes this work when the department
+session was closed three days ago.
+
+A department session sees its open dispatches at the top of its own injection, before its status
+file, and closes one with `hq.mjs done <id> --note "<result>"`. The orchestrator's queue is the
+**Awaiting review** list on the dashboard.
+
 ## Configure the cadence
 
 Nagging that does not fit how you work gets turned off, and then the whole thing rots. So the

@@ -116,6 +116,43 @@ Its job is four things, and department work is not one of them:
 department's code, it acquires that department's context, and the seat is gone — that is the
 one-session model again, wearing a hat.
 
+### Dispatching work
+
+When the human says *"tell the video session to do X"*:
+
+1. **Always `dispatch` first.**
+
+   ```bash
+   hq.mjs dispatch --to video "re-render the intro with the fixed logo"
+   ```
+
+   This is the record, and it works whether or not that session is running — which is usually the
+   case, because department sessions get closed once their work is written back.
+
+2. **Then, optionally, get their attention.** *If* the harness exposes cross-session messaging tools
+   *and* a live session for that domain is actually listed, send it a one-line message pointing at
+   the dispatch id. That is a courtesy and never the channel: message delivery and permissions are
+   the harness's business, and an undelivered message leaves no trace. The dispatch on disk does.
+
+3. **Do not do the task yourself.** You dispatched it because it belongs to a domain that knows the
+   area better than you do.
+
+**As a department session:** your open dispatches appear at the top of your injection, before your
+own status file. Do them first unless the user says otherwise, then close each one:
+
+```bash
+hq.mjs done <id> --note "<one line: what actually happened>"
+```
+
+The note is the outcome, not the activity. If it could not be done, still mark it `done` with a note
+saying why — an honest dead end is a result, and leaving it open pretends work is in progress.
+Then update your status file as usual; the note is a receipt, the status file is where the
+reasoning lives.
+
+**As the orchestrator:** the dashboard's **Awaiting review** list is your queue. Read the note,
+check the specifics it claims — the file, the number, the output — and then `ack <id>`. If the
+result is wrong or thin, do not ack: dispatch a follow-up naming what is missing.
+
 ### Why this makes sessions disposable
 
 The record lives in the HQ, not in any session's transcript. So a department session can be closed
@@ -149,7 +186,10 @@ department session then delegating to subagents is the other one.
 | `/hq-update [domain]` | write this session's outcome back |
 | `/hq-inbox <idea>` | append one line to the ideas inbox |
 | `/hq-decide <decision>` | append one line to the decision log |
-| `/hq-dashboard` | every domain on one screen: stale, blocked, untouched |
+| `/hq-dashboard` | every domain on one screen: stale, blocked, untouched, awaiting review |
+| `/hq-dispatch` | hand a task to another domain, durably |
+| `/hq-done` | report a dispatched task finished, with the result |
+| `/hq-ack` | review a finished dispatch and close it |
 | `/hq-doctor` | check config, folders, and hook wiring |
 
 ## What does not belong in the HQ

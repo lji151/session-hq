@@ -12,6 +12,7 @@ There are three, and they differ in exactly one way: how much they can guarantee
 | Setup | install the plugin, `/hq-init` | `hq.mjs wrap -- <cmd>` | paste 3 lines into `AGENTS.md` etc. |
 | Works with | Claude Code | any command-line agent | any agent that reads an instruction file |
 | Status read at start | **guaranteed** — injected before the first turn | **guaranteed** — printed before the agent starts | best effort — the agent may skip it |
+| Open dispatches shown | **yes** | **yes** | only if the instruction file says to run `inject` |
 | Activity signal | **per tool call** (`PostToolUse`) | elapsed wall-clock time | none |
 | Nudge during the session | yes (`update.mode: "periodic"`) | no | no |
 | Omission noticed at the end | **guaranteed** — `Stop` hook | **guaranteed** — after the process exits | no |
@@ -40,8 +41,8 @@ The generic adapter, and the one to reach for with anything else:
 node scripts/hq.mjs wrap --domain apps -- <your agent command>
 ```
 
-It prints the injection, runs the command with the terminal attached, and after the process exits
-checks whether the status file changed. The child's exit code is propagated and the reminder goes
+It prints the injection — including any open dispatches for that domain — runs the command with
+the terminal attached, and after the process exits checks whether the status file changed. The child's exit code is propagated and the reminder goes
 to stderr, so it composes in scripts and pipelines.
 
 What it cannot do: see inside the session. It has no idea whether the agent ran two tools or two
