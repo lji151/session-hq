@@ -80,6 +80,101 @@ describe('init', () => {
       fs.rmSync(dir, { recursive: true, force: true });
     }
   });
+
+  test('writes dashboard.html so the first run ends with something to look at', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'session-hq-initdash-'));
+    try {
+      const { stdout } = hq(['init', '--root', dir, '--domains', 'apps'], { env: { HQ_ROOT: dir } });
+      assert.match(stdout, /dashboard written to/);
+      const out = path.join(dir, 'dashboard.html');
+      assert.ok(fs.existsSync(out));
+      assert.match(fs.readFileSync(out, 'utf8'), /<!doctype html>/i);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('init: profiles', () => {
+  const profileDir = () => fs.mkdtempSync(path.join(os.tmpdir(), 'session-hq-profile-'));
+  const readConfigAt = (dir) => JSON.parse(fs.readFileSync(path.join(dir, 'hq.config.json'), 'utf8'));
+  const GENTLE = { mode: 'on-stop', everyNTools: 0, minMinutesBetween: 20, enforce: false };
+
+  test('--profile gentle: one reminder at session end, never blocking', () => {
+    const dir = profileDir();
+    try {
+      hq(['init', '--root', dir, '--domains', 'apps', '--profile', 'gentle'], { env: { HQ_ROOT: dir } });
+      assert.deepEqual(readConfigAt(dir).update, GENTLE);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('--profile coaching: a nudge every 40 tool calls', () => {
+    const dir = profileDir();
+    try {
+      hq(['init', '--root', dir, '--domains', 'apps', '--profile', 'coaching'], { env: { HQ_ROOT: dir } });
+      assert.deepEqual(readConfigAt(dir).update,
+        { mode: 'periodic', everyNTools: 40, minMinutesBetween: 20, enforce: false });
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('--profile strict: on-stop, and it enforces', () => {
+    const dir = profileDir();
+    try {
+      hq(['init', '--root', dir, '--domains', 'apps', '--profile', 'strict'], { env: { HQ_ROOT: dir } });
+      assert.deepEqual(readConfigAt(dir).update,
+        { mode: 'on-stop', everyNTools: 0, minMinutesBetween: 20, enforce: true });
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('--profile orchestrator: gentle cadence, plus how to start the coordinating session', () => {
+    const dir = profileDir();
+    try {
+      const { stdout } = hq(['init', '--root', dir, '--domains', 'apps', '--profile', 'orchestrator'], { env: { HQ_ROOT: dir } });
+      assert.deepEqual(readConfigAt(dir).update, GENTLE);
+      assert.match(stdout, /HQ_DOMAIN=hq/);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('no --profile defaults to gentle', () => {
+    const dir = profileDir();
+    try {
+      hq(['init', '--root', dir, '--domains', 'apps'], { env: { HQ_ROOT: dir } });
+      assert.deepEqual(readConfigAt(dir).update, GENTLE);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('an unknown --profile is refused, before anything is written', () => {
+    const dir = profileDir();
+    try {
+      const { code, stderr } = hq(['init', '--root', dir, '--domains', 'apps', '--profile', 'chaotic'], { env: { HQ_ROOT: dir } });
+      assert.equal(code, 1);
+      assert.match(stderr, /--profile must be one of/);
+      assert.ok(!fs.existsSync(path.join(dir, 'hq.config.json')));
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('--yes defaults silently: no prompt, built-in domains and gentle cadence', () => {
+    const dir = profileDir();
+    try {
+      const { code, stdout } = hq(['init', '--yes'], { env: { HQ_ROOT: dir } });
+      assert.equal(code, 0, stdout);
+      const cfg = readConfigAt(dir);
+      assert.deepEqual(cfg.domains, ['video', 'apps', 'business']);
+      assert.deepEqual(cfg.update, GENTLE);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
+
+  test('init still never overwrites an existing file without --force', () => {
+    const dir = profileDir();
+    try {
+      hq(['init', '--root', dir, '--domains', 'apps', '--profile', 'strict'], { env: { HQ_ROOT: dir } });
+      const before = readConfigAt(dir);
+      // A second run asking for a different profile must not touch the kept config.
+      const { stdout } = hq(['init', '--root', dir, '--domains', 'apps', '--profile', 'gentle'], { env: { HQ_ROOT: dir } });
+      assert.match(stdout, /kept.*hq\.config\.json/);
+      assert.deepEqual(readConfigAt(dir), before);
+    } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  });
 });
 
 describe('doctor', () => {

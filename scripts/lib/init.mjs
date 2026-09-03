@@ -1,15 +1,72 @@
 // Creating, and repairing, an HQ folder.
 import fs from 'node:fs';
 import path from 'node:path';
-import { isFile, writeJson, expandHome, safeSlug, todayIso, nowIso, renderTemplate } from './util.mjs';
+import readline from 'node:readline/promises';
+import { isFile, writeJson, expandHome, safeSlug, todayIso, nowIso, renderTemplate,
+         safeReadJson, deepMerge } from './util.mjs';
 import { DEFAULT_CONFIG, CONFIG_NAME, discoverConfig } from './config.mjs';
 import { DISPATCH_FILE } from './dispatch.mjs';
-export function cmdInit(flags) {
+import { collectDashboard, renderHtml } from './dashboard.mjs';
+
+/**
+ * update.* for each profile. Existing config keys only — a profile is a named
+ * shortcut for a combination people actually run, not a new setting.
+ */
+export const PROFILES = {
+  gentle:       { mode: 'on-stop',  everyNTools: 0,  minMinutesBetween: 20, enforce: false },
+  coaching:     { mode: 'periodic', everyNTools: 40, minMinutesBetween: 20, enforce: false },
+  strict:       { mode: 'on-stop',  everyNTools: 0,  minMinutesBetween: 20, enforce: true },
+  // Same cadence as gentle; what makes it "orchestrator" is running one session
+  // with HQ_DOMAIN=hq, which `init` prints a reminder about below.
+  orchestrator: { mode: 'on-stop',  everyNTools: 0,  minMinutesBetween: 20, enforce: false },
+};
+const ANSWER_TO_PROFILE = { '': 'gentle', '1': 'gentle', '2': 'coaching', '3': 'strict' };
+
+const Q1 = 'Where should the HQ live? [~/hq] ';
+const Q2 = 'What are your domains? (projects, clients, or life areas — you can rename later) ' +
+  '[video, apps, business] ';
+const Q3 =
+  'How should sessions be reminded?\n' +
+  '  [1] gentle — one reminder at session end (default)\n' +
+  '  [2] coaching — a nudge every 40 tool calls\n' +
+  '  [3] strict — a session cannot end without updating\n' +
+  '> ';
+
+export async function cmdInit(flags) {
   const existing = discoverConfig();
+
+  let rootAnswer = typeof flags.root === 'string' ? flags.root : null;
+  let domainsAnswer = typeof flags.domains === 'string' ? flags.domains : null;
+  let profileName = typeof flags.profile === 'string' ? safeSlug(flags.profile) : null;
+  if (profileName && !PROFILES[profileName]) {
+    console.error(`hq init: --profile must be one of ${Object.keys(PROFILES).join(' | ')}`);
+    process.exitCode = 1;
+    return;
+  }
+
+  // A TTY with no --yes gets asked; everything else (a script, CI, --yes) gets
+  // silent defaults. Flags always win over a question, one at a time.
+  const interactive = Boolean(process.stdin.isTTY) && !flags.yes;
+  if (interactive && (rootAnswer === null || domainsAnswer === null || profileName === null)) {
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+    try {
+      if (rootAnswer === null) rootAnswer = (await rl.question(Q1)).trim() || '~/hq';
+      if (domainsAnswer === null) domainsAnswer = (await rl.question(Q2)).trim() || 'video, apps, business';
+      if (profileName === null) {
+        const answer = (await rl.question(Q3)).trim();
+        profileName = ANSWER_TO_PROFILE[answer] || 'gentle';
+      }
+    } finally {
+      rl.close();
+    }
+  }
+  profileName = profileName || 'gentle';
+
   const root = path.resolve(expandHome(
-    flags.root || process.env.HQ_ROOT || (existing && existing.hqRoot) || DEFAULT_CONFIG.hqRoot
+    rootAnswer || process.env.HQ_ROOT || (existing && existing.hqRoot) || DEFAULT_CONFIG.hqRoot
   ));
-  const domains = (typeof flags.domains === 'string' ? flags.domains.split(',') : DEFAULT_CONFIG.domains)
+  const domains = (domainsAnswer || DEFAULT_CONFIG.domains.join(','))
+    .split(',')
     .map(safeSlug)
     .filter(Boolean);
   if (domains.length === 0) {
@@ -24,7 +81,15 @@ export function cmdInit(flags) {
 
   fs.mkdirSync(path.join(root, '.state'), { recursive: true });
 
-  const config = { ...DEFAULT_CONFIG, hqRoot: flags.root ? root : DEFAULT_CONFIG.hqRoot, domains };
+  // An answer/flag that differs from the placeholder default pins the absolute
+  // path; the untouched default keeps `hqRoot` portable (config-directory-relative).
+  const rootIsExplicit = Boolean(rootAnswer) && rootAnswer !== DEFAULT_CONFIG.hqRoot;
+  const config = {
+    ...DEFAULT_CONFIG,
+    hqRoot: rootIsExplicit ? root : DEFAULT_CONFIG.hqRoot,
+    domains,
+    update: { ...DEFAULT_CONFIG.update, ...PROFILES[profileName] },
+  };
   if (!isFile(cfgPath) || flags.force) {
     writeJson(cfgPath, config);
     created.push(cfgPath);
@@ -62,4 +127,23 @@ export function cmdInit(flags) {
   console.log('');
   console.log('Next: set HQ_DOMAIN per session, or set "defaultDomain" in hq.config.json.');
   console.log('Then run: node scripts/hq.mjs doctor');
+
+  if (profileName === 'orchestrator') {
+    console.log('');
+    console.log('Orchestrator profile: start one coordinating session with HQ_DOMAIN=hq set');
+    console.log('(for example: HQ_DOMAIN=hq claude) to see the whole HQ instead of one domain.');
+  }
+
+  // Something to look at from the first run. Read the config back from disk —
+  // on a kept (not overwritten) config this reflects what is actually there.
+  try {
+    const onDisk = deepMerge(DEFAULT_CONFIG, safeReadJson(cfgPath));
+    const dashOut = path.join(root, 'dashboard.html');
+    const data = collectDashboard(onDisk, root, onDisk.inject.staleAfterHours);
+    fs.writeFileSync(dashOut, renderHtml(data), 'utf8');
+    console.log('');
+    console.log(`dashboard written to ${dashOut}`);
+  } catch {
+    // Never let a dashboard render hiccup take `init` down with it.
+  }
 }

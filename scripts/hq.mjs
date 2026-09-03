@@ -5,7 +5,7 @@
  * Single entry point for every hook and slash command in the plugin.
  * Node built-ins only. ESM. No dependencies.
  *
- *   node hq.mjs init          [--root <dir>] [--domains a,b,c] [--force]
+ *   node hq.mjs init          [--root <dir>] [--domains a,b,c] [--profile gentle|coaching|strict|orchestrator] [--yes] [--force]
  *   node hq.mjs inject        [--event session-start|compact|manual] [--domain d] [--print]
  *   node hq.mjs remind                        (PostToolUse: periodic nudge)
  *   node hq.mjs update-check   [--domain d]     (Stop hook, or a manual report from a shell)
@@ -57,7 +57,8 @@ async function cmdLeakCheck(argv) {
 
 const USAGE = `session-hq
 
-  hq.mjs init          [--root <dir>] [--domains a,b,c] [--force]
+  hq.mjs init          [--root <dir>] [--domains a,b,c] [--profile <name>] [--yes] [--force]
+                                                three questions on a TTY; flags take precedence
   hq.mjs inject        [--event session-start|compact|manual] [--domain d] [--print]
   hq.mjs remind                                  PostToolUse counter / periodic nudge
   hq.mjs update-check  [--domain d]              Stop hook; from a shell, reports on the domain
