@@ -16,6 +16,8 @@
  *   node hq.mjs ack           <id>
  *   node hq.mjs dispatches    [--domain d] [--open|--awaiting-review|--all]
  *   node hq.mjs dashboard     [--watch [seconds]] [--no-open] [--terminal | --md | --html <file>]
+ *                             [--theme auto|paper|terminal|slate] [--density comfortable|compact]
+ *                             [--labels en|ko]
  *   node hq.mjs doctor        [--json]
  *   node hq.mjs memory-lint   [--dir <dir>] [--json]
  *   node hq.mjs leak-check    [--denylist <file>] [--dir <dir>]
@@ -39,6 +41,11 @@ import { cmdMemoryLint } from './lib/memory.mjs';
 export { DEFAULT_CONFIG, CONFIG_NAME, discoverConfig, validateConfig, statusPath,
          resolveDomain, accountableDomain, isOrchestratorDomain } from './lib/config.mjs';
 export { expandHome, safeSlug } from './lib/util.mjs';
+export { collectDashboard, renderHtml, renderMarkdown, renderTerminal,
+         resolveDashboardOptions } from './lib/dashboard.mjs';
+export { THEMES, THEME_NAMES, DENSITIES, DENSITY_NAMES, SECTION_NAMES,
+         DEFAULT_SECTIONS, buildCss } from './lib/theme.mjs';
+export { LABEL_SETS, LABEL_SET_NAMES, LABELS_EN, LABELS_KO, resolveLabels } from './lib/labels.mjs';
 export { lastUpdatedAt, hashFile, parseStatusFile, summariseDomain } from './lib/status.mjs';
 export { dispatchPath, parseDispatches, readDispatches, openDispatchesFor,
          awaitingReview } from './lib/dispatch.mjs';
@@ -70,6 +77,8 @@ const USAGE = `session-hq
   hq.mjs ack           <id>                        review and close a finished dispatch
   hq.mjs dispatches    [--domain d] [--awaiting-review|--all]
   hq.mjs dashboard     [--watch [seconds]] [--no-open] [--terminal | --md]   one page, opened for you
+                       [--theme auto|paper|terminal|slate] [--density comfortable|compact]
+                       [--labels en|ko]                    pick a look for this run
   hq.mjs doctor        [--json]
   hq.mjs memory-lint   [--dir <dir>] [--json]
   hq.mjs leak-check    [--denylist <file>] [--dir <dir>]

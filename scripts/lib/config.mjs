@@ -3,6 +3,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { expandHome, isFile, safeReadJson, deepMerge, safeSlug } from './util.mjs';
+import { THEMES, DENSITIES, SECTION_NAMES, THEME_NAMES, DENSITY_NAMES, DEFAULT_SECTIONS } from './theme.mjs';
+import { LABEL_SETS, LABEL_SET_NAMES } from './labels.mjs';
 
 export const CONFIG_NAME = 'hq.config.json';
 export const DEFAULT_CONFIG = {
@@ -15,6 +17,20 @@ export const DEFAULT_CONFIG = {
   inbox: { file: 'ideas-inbox.md' },
   decisions: { file: 'decisions.md' },
   language: 'en',
+  // How the dashboard page looks. Every key is optional; `null` means "unset",
+  // which is not the same as a value — `labels: null` follows `language`, and
+  // `title: null` takes the label set's own title.
+  dashboard: {
+    theme: 'auto',
+    title: null,
+    accent: null,
+    font: null,
+    density: 'comfortable',
+    sections: DEFAULT_SECTIONS,
+    labels: null,
+    showHqRoot: true,
+    decisions: 3,
+  },
 };
 const INJECT_MODES = ['session-start', 'session-start+compact', 'off'];
 const UPDATE_MODES = ['on-stop', 'periodic', 'manual'];
@@ -87,7 +103,45 @@ export function validateConfig(config) {
   }
   if (!config.inbox?.file) errors.push('inbox.file is required');
   if (!config.decisions?.file) errors.push('decisions.file is required');
+  validateDashboard(config.dashboard, errors, warnings);
   return { errors, warnings };
+}
+
+/**
+ * The dashboard block. An unrecognised *name* is a warning, not an error: the
+ * renderer falls back to the default and still gives you a page. A wrong *type*
+ * is an error, because there is nothing sensible to fall back to.
+ */
+function validateDashboard(d, errors, warnings) {
+  if (d === undefined || d === null) return;
+  if (typeof d !== 'object' || Array.isArray(d)) { errors.push('dashboard must be an object'); return; }
+
+  if (d.theme != null && !THEMES[d.theme]) warnings.push(`dashboard.theme "${d.theme}" is not one of ${THEME_NAMES.join(' | ')}; the page will use auto`);
+  if (d.density != null && !DENSITIES[d.density]) warnings.push(`dashboard.density "${d.density}" is not one of ${DENSITY_NAMES.join(' | ')}; the page will use comfortable`);
+  if (d.title != null && typeof d.title !== 'string') errors.push('dashboard.title must be a string or null');
+  if (d.accent != null && !/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(String(d.accent))) {
+    warnings.push('dashboard.accent should be a hex colour like "#8a4b00"; it will be ignored');
+  }
+  if (d.font != null && typeof d.font !== 'string') errors.push('dashboard.font must be a string or null');
+  if (d.showHqRoot != null && typeof d.showHqRoot !== 'boolean') errors.push('dashboard.showHqRoot must be a boolean');
+  if (d.decisions != null && (!Number.isInteger(d.decisions) || d.decisions < 0)) {
+    errors.push('dashboard.decisions must be a non-negative integer');
+  }
+  if (d.sections != null) {
+    if (!Array.isArray(d.sections)) errors.push('dashboard.sections must be an array');
+    else {
+      const unknown = d.sections.filter((s) => !SECTION_NAMES.includes(String(s)));
+      if (unknown.length) warnings.push(`dashboard.sections has unknown entries (${unknown.join(', ')}); known sections are ${SECTION_NAMES.join(', ')}`);
+      if (d.sections.length === 0) warnings.push('dashboard.sections is empty, so the page will have nothing on it but a header');
+    }
+  }
+  if (d.labels != null) {
+    if (typeof d.labels === 'string') {
+      if (!LABEL_SETS[d.labels]) warnings.push(`dashboard.labels "${d.labels}" is not one of ${LABEL_SET_NAMES.join(' | ')}; English will be used`);
+    } else if (typeof d.labels !== 'object' || Array.isArray(d.labels)) {
+      errors.push('dashboard.labels must be a language name or an object of label overrides');
+    }
+  }
 }
 
 /* ------------------------------------------------------------------- paths */

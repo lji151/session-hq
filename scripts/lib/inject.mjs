@@ -6,7 +6,7 @@ import { discoverConfig, statusPath, statePath, resolveDomain, accountableDomain
          isOrchestratorDomain } from './config.mjs';
 import { lastUpdatedAt, hashFile } from './status.mjs';
 import { dispatchPath, dispatchBlock } from './dispatch.mjs';
-import { collectDashboard, renderMarkdown } from './dashboard.mjs';
+import { collectDashboard, renderMarkdown, resolveDashboardOptions } from './dashboard.mjs';
 import { readHookInput, emit } from './hooks.mjs';
 export function cmdInject(flags) {
   const event = flags.event || 'manual';
@@ -155,7 +155,8 @@ export function buildOrchestratorContext({ config, hqRoot, domain, adapter = 'ho
 
   if (config.orchestrator?.injectDashboard !== false) {
     const data = collectDashboard(config, hqRoot, config.inject.staleAfterHours);
-    out.push(trimToLines(renderMarkdown(data), maxLines));
+    const look = resolveDashboardOptions(config, {}, { warn: () => {} });
+    out.push(trimToLines(renderMarkdown(data, look), maxLines));
     out.push('');
   }
 

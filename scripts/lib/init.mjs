@@ -6,7 +6,7 @@ import { isFile, writeJson, expandHome, safeSlug, todayIso, nowIso, renderTempla
          safeReadJson, deepMerge } from './util.mjs';
 import { DEFAULT_CONFIG, CONFIG_NAME, discoverConfig } from './config.mjs';
 import { DISPATCH_FILE } from './dispatch.mjs';
-import { collectDashboard, renderHtml } from './dashboard.mjs';
+import { collectDashboard, renderHtml, resolveDashboardOptions } from './dashboard.mjs';
 
 /**
  * update.* for each profile. Existing config keys only — a profile is a named
@@ -140,7 +140,8 @@ export async function cmdInit(flags) {
     const onDisk = deepMerge(DEFAULT_CONFIG, safeReadJson(cfgPath));
     const dashOut = path.join(root, 'dashboard.html');
     const data = collectDashboard(onDisk, root, onDisk.inject.staleAfterHours);
-    fs.writeFileSync(dashOut, renderHtml(data), 'utf8');
+    const look = resolveDashboardOptions(onDisk, {}, { warn: () => {} });
+    fs.writeFileSync(dashOut, renderHtml(data, look), 'utf8');
     console.log('');
     console.log(`dashboard written to ${dashOut}`);
   } catch {

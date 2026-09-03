@@ -1,10 +1,16 @@
 ---
 description: Open the HQ dashboard — one page with what you missed, refreshed on demand
-argument-hint: "[--watch] [--stale-hours N]"
+argument-hint: "[theme] [--watch] [--stale-hours N]"
 allowed-tools: ["Bash", "Read"]
 ---
 
 # The HQ dashboard
+
+`$ARGUMENTS` may begin with a bare theme word — `auto`, `paper`, `terminal` or `slate`. When it
+does, turn that first word into `--theme <word>` and pass the rest through unchanged; everything
+else is already flags. So `/hq-dashboard paper --watch` runs `dashboard --theme paper --watch`.
+A theme given this way applies to this one run only and does not change the config; `/hq-theme`
+is the command that makes a choice stick.
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/hq.mjs" dashboard $ARGUMENTS
@@ -13,7 +19,8 @@ node "${CLAUDE_PLUGIN_ROOT}/scripts/hq.mjs" dashboard $ARGUMENTS
 That writes and opens one page — no server, no scripts, just HTML. It stays fresh by running the
 command again, or by adding `--watch` to keep it regenerating on its own.
 
-Do not stop at opening it. Also pull the same picture as text, so it lands in this conversation:
+Do not stop at opening it. Also pull the same picture as text, so it lands in this conversation
+(the text views ignore `--theme`, so leave it off here):
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/hq.mjs" dashboard --terminal $ARGUMENTS
