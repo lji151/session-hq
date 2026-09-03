@@ -1,0 +1,21 @@
+{
+  "name": "session-hq",
+  "version": "0.1.0",
+  "description": "A shared, file-based headquarters for many Claude Code sessions: per-domain status files read at session start and updated at session end, an ideas inbox, and a decisions log, enforced by hooks with configurable cadence.",
+  "author": {
+    "name": "Your Name",
+    "email": "you@example.com",
+    "url": "https://github.com/your-github-username"
+  },
+  "homepage": "https://github.com/your-github-username/session-hq",
+  "repository": "https://github.com/your-github-username/session-hq",
+  "license": "MIT",
+  "keywords": [
+    "session-management",
+    "memory",
+    "hooks",
+    "orchestration",
+    "multi-session",
+    "handoff"
+  ]
+}

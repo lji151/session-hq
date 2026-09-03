@@ -1,0 +1,13 @@
+node_modules/
+.DS_Store
+Thumbs.db
+*.log
+
+# Never commit a live HQ. The examples/ tree is the only checked-in HQ.
+.state/
+hq.config.json
+!examples/**/hq.config.json
+
+# Local scratch
+tmp/
+.tmp/
