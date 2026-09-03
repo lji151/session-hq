@@ -5,7 +5,7 @@ Sessions working on **{{DOMAIN}}** read this first and update it last.
 Keep it short enough that reading it is never a chore. Archive dead sections; do not hoard.
 
 ### Example workstream — delete me
-- Status: created {{DATE}} by `/hq-init`. Nothing has happened yet.
+- Status: created {{DATE}} by `hq.mjs init`. Nothing has happened yet.
 - Next: replace this block with a real workstream the first time you work on {{DOMAIN}}.
 - Blocked on: nothing
 - Ruled out: nothing yet

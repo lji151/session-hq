@@ -224,6 +224,21 @@ Typical use is an alias, so the HQ is not something you have to remember:
 alias agent='node ~/session-hq/scripts/hq.mjs wrap --domain apps -- my-agent-cli'
 ```
 
+The context `wrap` prints is worded for a shell: it names the status file to edit and the exact
+`update-check` command to run, rather than the `/hq-update` slash command, which does not exist
+outside Claude Code.
+
+### `update-check` from a shell
+
+```bash
+node scripts/hq.mjs update-check --domain apps
+```
+
+With `--domain` it never reads stdin and reports on the domain rather than on a session: whether
+the status file has changed since the most recent recorded session for it, or how long ago it was
+last updated. It always exits 0 — failing a shell pipeline over an unwritten note would be
+obnoxious. Without `--domain` it expects a hook payload on stdin and behaves as the Stop hook.
+
 There is no slash command for `wrap`: inside Claude Code the hooks already do this automatically.
 
 ## Session state

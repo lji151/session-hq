@@ -390,6 +390,60 @@ describe('inbox and decisions', () => {
   });
 });
 
+describe('adapter-aware instructions', () => {
+  test('hook injection tells the model to use /hq-update', () => {
+    const { stdout } = hq(['inject', '--event', 'session-start'], {
+      stdin: { session_id: 'sess-voice-hook', cwd: ROOT },
+      env: { HQ_DOMAIN: 'apps' },
+    });
+    const text = JSON.parse(stdout).hookSpecificOutput.additionalContext;
+    assert.match(text, /update it with `\/hq-update`/);
+    assert.ok(!/update-check --domain/.test(text), 'hooks should not advertise the raw CLI');
+  });
+
+  test('inject --print tells a shell to edit the file and run update-check', () => {
+    const { stdout } = hq(['inject', '--print', '--domain', 'apps']);
+    assert.ok(!/\/hq-update/.test(stdout), 'there are no slash commands outside Claude Code');
+    assert.ok(!/\/hq-status/.test(stdout));
+    assert.match(stdout, /edit `status-apps\.md` directly/);
+    assert.match(stdout, /hq\.mjs" update-check --domain apps/);
+  });
+
+  test('the domain list adapts too', () => {
+    const hooked = hq(['inject', '--event', 'session-start'], {
+      stdin: { session_id: 'sess-voice-idx', cwd: ROOT }, env: { HQ_DOMAIN: '' },
+    });
+    assert.match(JSON.parse(hooked.stdout).hookSpecificOutput.additionalContext, /`\/hq-status <domain>`/);
+    const printed = hq(['inject', '--print'], { env: { HQ_DOMAIN: '' } });
+    assert.ok(!/\/hq-status/.test(printed.stdout));
+    assert.match(printed.stdout, /Pass `--domain <domain>`/);
+  });
+
+  test('wrap prints no slash commands at all', () => {
+    const { stdout, stderr } = hq(['wrap', '--domain', 'apps', '--expect-update', '--',
+      process.execPath, '-e', '0']);
+    assert.ok(!/\/hq-/.test(stdout), `wrap stdout mentioned a slash command: ${stdout}`);
+    assert.ok(!/\/hq-/.test(stderr), `wrap stderr mentioned a slash command: ${stderr}`);
+    assert.match(stdout, /hq\.mjs" update-check --domain apps/);
+  });
+
+  test('update-check --domain reports from a shell without a hook payload', () => {
+    const before = hq(['update-check', '--domain', 'apps']);
+    assert.equal(before.code, 0);
+    assert.match(before.stdout, /UNCHANGED since the session/);
+    assert.ok(!/\/hq-/.test(before.stdout));
+
+    fs.appendFileSync(statusFile('apps'), os.EOL + '- Status: written by hand' + os.EOL);
+    const after = hq(['update-check', '--domain', 'apps']);
+    assert.match(after.stdout, /Nothing outstanding/);
+  });
+
+  test('update-check --domain on an unknown domain says so rather than hanging', () => {
+    const { stdout } = hq(['update-check', '--domain', 'nosuchdomain']);
+    assert.match(stdout, /does not exist yet/);
+  });
+});
+
 describe('config discovery', () => {
   test('walks up from cwd to find hq.config.json', () => {
     const nested = path.join(ROOT, 'a', 'b', 'c');

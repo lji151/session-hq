@@ -8,7 +8,7 @@
  *   node hq.mjs init          [--root <dir>] [--domains a,b,c] [--force]
  *   node hq.mjs inject        [--event session-start|compact|manual] [--domain d] [--print]
  *   node hq.mjs remind                        (PostToolUse: periodic nudge)
- *   node hq.mjs update-check                  (Stop: did this session update its status file?)
+ *   node hq.mjs update-check   [--domain d]     (Stop hook, or a manual report from a shell)
  *   node hq.mjs inbox         <text...>       [--domain d]
  *   node hq.mjs decide        <text...>       [--domain d]
  *   node hq.mjs doctor        [--json]
@@ -23,7 +23,8 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const HERE = path.dirname(fileURLToPath(import.meta.url));
+const SELF = fileURLToPath(import.meta.url);
+const HERE = path.dirname(SELF);
 const PLUGIN_ROOT = path.resolve(HERE, '..');
 const TEMPLATES = path.join(PLUGIN_ROOT, 'templates');
 const CONFIG_NAME = 'hq.config.json';
@@ -175,12 +176,19 @@ function statePath(hqRoot, sessionId) {
 
 export function readHookInput() {
   try {
+    // A terminal never sends EOF, so reading fd 0 there would block forever.
+    if (process.stdin.isTTY) return {};
     const raw = fs.readFileSync(0, 'utf8');
     if (!raw.trim()) return {};
     return JSON.parse(raw);
   } catch {
     return {};
   }
+}
+
+/** A copy-pasteable invocation of this very script, for adapters with no slash commands. */
+function cliCmd(rest) {
+  return `node "${SELF}" ${rest}`;
 }
 
 function emit(obj) {
@@ -321,7 +329,7 @@ function cmdInject(flags) {
   const found = discoverConfig({ cwd });
   if (!found) {
     // Stay silent inside hooks: an unconfigured machine should never be nagged.
-    if (printMode) console.log('session-hq: no hq.config.json found. Run /hq-init to create one.');
+    if (printMode) console.log('session-hq: no hq.config.json found. Run `hq.mjs init` to create one.');
     return;
   }
   const { config, hqRoot } = found;
@@ -330,9 +338,10 @@ function cmdInject(flags) {
   if (event === 'compact' && config.inject.on !== 'session-start+compact') return;
 
   const domain = resolveDomain({ config, explicit: typeof flags.domain === 'string' ? flags.domain : null });
+  const adapter = printMode ? 'cli' : 'hooks';
   const body = domain
-    ? buildDomainContext({ config, hqRoot, domain })
-    : buildIndexContext({ config, hqRoot });
+    ? buildDomainContext({ config, hqRoot, domain, adapter })
+    : buildIndexContext({ config, hqRoot, adapter });
 
   // Record session state so `update-check` can tell whether anything changed.
   if (hook.session_id) {
@@ -368,7 +377,7 @@ export function trimToLines(text, maxLines) {
     `\n\n… trimmed to ${maxLines} lines (inject.maxLines). Read the full file for the rest.`;
 }
 
-function buildDomainContext({ config, hqRoot, domain }) {
+function buildDomainContext({ config, hqRoot, domain, adapter = 'hooks' }) {
   const file = statusPath(hqRoot, domain);
   const head = [
     '## session-hq — HQ status for this session',
@@ -376,7 +385,9 @@ function buildDomainContext({ config, hqRoot, domain }) {
     `Domain: **${domain}**   ·   HQ root: \`${hqRoot}\``,
   ];
   if (!isFile(file)) {
-    head.push('', `No status file yet at \`${path.basename(file)}\`. Run \`/hq-update ${domain}\` at the end of this session to create one.`);
+    head.push('', adapter === 'hooks'
+      ? `No status file yet at \`${path.basename(file)}\`. Run \`/hq-update ${domain}\` at the end of this session to create one.`
+      : `No status file yet. Create it at \`${file}\` before this session ends.`);
     return head.join('\n');
   }
   const stamp = lastUpdatedAt(file);
@@ -390,18 +401,26 @@ function buildDomainContext({ config, hqRoot, domain }) {
   } else {
     head.push('', `Last updated ${Math.round(age)}h ago (from ${stamp.source}).`);
   }
-  head.push(
-    '',
-    'Read this before planning. At the end of the session update it with `/hq-update` —',
-    'what changed, what is next, what is blocked, and what you *ruled out*.',
-    '',
-    '---',
-    ''
-  );
+  head.push('');
+  if (adapter === 'hooks') {
+    head.push(
+      'Read this before planning. At the end of the session update it with `/hq-update` —',
+      'what changed, what is next, what is blocked, and what you *ruled out*.'
+    );
+  } else {
+    // No slash commands here: this text is printed by `wrap`, or by `inject --print` in a shell.
+    head.push(
+      `Read this before planning. At the end of the session edit \`${path.basename(file)}\` directly —`,
+      'what changed, what is next, what is blocked, and what you *ruled out*. Then check with:',
+      '',
+      `    ${cliCmd(`update-check --domain ${domain}`)}`
+    );
+  }
+  head.push('', '---', '');
   return head.join('\n') + trimToLines(fs.readFileSync(file, 'utf8'), config.inject.maxLines);
 }
 
-function buildIndexContext({ config, hqRoot }) {
+function buildIndexContext({ config, hqRoot, adapter = 'hooks' }) {
   const lines = [
     '## session-hq — no domain selected',
     '',
@@ -413,11 +432,10 @@ function buildIndexContext({ config, hqRoot }) {
     const stamp = lastUpdatedAt(statusPath(hqRoot, safeSlug(d)));
     lines.push(`- **${d}** — ${stamp ? `${Math.round(hoursSince(stamp.at))}h ago` : 'no status file yet'}`);
   }
-  lines.push(
-    '',
-    'Pick one with `/hq-status <domain>` before doing project work, or set `HQ_DOMAIN`',
-    'in the environment / `defaultDomain` in `hq.config.json` so it happens automatically.'
-  );
+  lines.push('', adapter === 'hooks'
+    ? 'Pick one with `/hq-status <domain>` before doing project work, or set `HQ_DOMAIN`'
+    : 'Pass `--domain <domain>` before doing project work, or set `HQ_DOMAIN`',
+    'in the environment / `defaultDomain` in `hq.config.json` so it happens automatically.');
   return lines.join('\n');
 }
 
@@ -469,7 +487,19 @@ function cmdRemind() {
 
 /* ------------------------------------------------------- cmd:update-check */
 
-function cmdUpdateCheck() {
+function cmdUpdateCheck(flags = {}) {
+  const explicitDomain = typeof flags.domain === 'string' ? flags.domain : null;
+  if (explicitDomain) {
+    // Invoked from a shell: a report on the domain, not a check on a session.
+    const cfg = discoverConfig();
+    if (!cfg) {
+      console.error('hq: no hq.config.json found. Run `hq.mjs init` first.');
+      process.exitCode = 1;
+      return;
+    }
+    return manualUpdateCheck({ config: cfg.config, hqRoot: cfg.hqRoot, explicitDomain });
+  }
+
   const hook = readHookInput();
   // Never fight a Stop hook that is already re-entering, or the session loops forever.
   if (hook.stop_hook_active) return;
@@ -477,8 +507,9 @@ function cmdUpdateCheck() {
   const found = discoverConfig({ cwd: hook.cwd || process.cwd() });
   if (!found) return;
   const { config, hqRoot } = found;
+  // No session id: a bare shell invocation. Fall back to the domain report.
+  if (!hook.session_id) return manualUpdateCheck({ config, hqRoot, explicitDomain: null });
   if (config.update.mode !== 'on-stop') return;
-  if (!hook.session_id) return;
 
   const sp = statePath(hqRoot, hook.session_id);
   if (!isFile(sp)) return;
@@ -503,6 +534,47 @@ function cmdUpdateCheck() {
   else emit({ systemMessage: reason });
 }
 
+/**
+ * `update-check --domain <d>` with no hook payload: compare the status file against
+ * the newest recorded session for that domain and say, in plain language, whether
+ * anything has been written back since. Always exits 0 — this is a report, and
+ * failing a shell pipeline over an unwritten note would be obnoxious.
+ */
+function manualUpdateCheck({ config, hqRoot, explicitDomain }) {
+  const domain = resolveDomain({ config, explicit: explicitDomain });
+  if (!domain) {
+    console.error('hq update-check: no domain. Pass --domain <d>, or set HQ_DOMAIN / defaultDomain.');
+    process.exitCode = 1;
+    return;
+  }
+  const file = statusPath(hqRoot, domain);
+  if (!isFile(file)) {
+    console.log(`status-${domain}.md does not exist yet at ${file}`);
+    return;
+  }
+
+  const stateDir = path.join(hqRoot, '.state');
+  let newest = null;
+  if (isDir(stateDir)) {
+    for (const f of fs.readdirSync(stateDir).filter((n) => n.endsWith('.json'))) {
+      const st = safeReadJson(path.join(stateDir, f));
+      if (st.domain !== domain || !st.startedAt) continue;
+      if (!newest || st.startedAt > newest.startedAt) newest = st;
+    }
+  }
+
+  const stamp = lastUpdatedAt(file);
+  const age = Math.round(hoursSince(stamp.at));
+  if (newest && newest.statusHashAtStart && newest.statusHashAtStart === hashFile(file)) {
+    console.log(`status-${domain}.md is UNCHANGED since the session that started ${newest.startedAt}.`);
+    console.log('Append what happened - outcome, next step, blockers, and anything you ruled out.');
+    console.log('Negative results matter: they stop the next session repeating your work.');
+    console.log(`  ${file}`);
+    return;
+  }
+  console.log(`status-${domain}.md was last updated ${age}h ago (${stamp.source}). Nothing outstanding.`);
+}
+
 /* ------------------------------------------------------- cmd:inbox/decide */
 
 function appendLine(kind, flags, positional) {
@@ -514,7 +586,7 @@ function appendLine(kind, flags, positional) {
   }
   const found = discoverConfig();
   if (!found) {
-    console.error('hq: no hq.config.json found. Run /hq-init first.');
+    console.error('hq: no hq.config.json found. Run `hq.mjs init` first.');
     process.exitCode = 1;
     return;
   }
@@ -543,7 +615,7 @@ export function cmdDoctor(flags = {}) {
 
   const found = discoverConfig();
   if (!found) {
-    add('error', 'config', `no ${CONFIG_NAME} found via HQ_ROOT, cwd walk-up, or ~/.session-hq/. Run /hq-init.`);
+    add('error', 'config', `no ${CONFIG_NAME} found via HQ_ROOT, cwd walk-up, or ~/.session-hq/. Run \`hq.mjs init\` (or /hq-init).`);
     return finishDoctor(report, flags);
   }
   const { config, configPath, hqRoot, source } = found;
@@ -573,7 +645,7 @@ export function cmdDoctor(flags = {}) {
   for (const d of config.domains || []) {
     const f = statusPath(hqRoot, d);
     if (!isFile(f)) {
-      add('warn', `status-${safeSlug(d)}`, `missing — run /hq-update ${d}, or /hq-init --force`);
+      add('warn', `status-${safeSlug(d)}`, `missing - create it, or re-run init with --force`);
     } else {
       const stamp = lastUpdatedAt(f);
       const age = Math.round(hoursSince(stamp.at));
@@ -747,7 +819,9 @@ function cmdWrap(rawArgs) {
   const domain = resolveDomain({ config, explicit: typeof flags.domain === 'string' ? flags.domain : null });
 
   if (!flags.quiet) {
-    console.log(domain ? buildDomainContext({ config, hqRoot, domain }) : buildIndexContext({ config, hqRoot }));
+    console.log(domain
+      ? buildDomainContext({ config, hqRoot, domain, adapter: 'cli' })
+      : buildIndexContext({ config, hqRoot, adapter: 'cli' }));
     console.log('');
   }
 
@@ -786,7 +860,7 @@ function cmdWrap(rawArgs) {
         'Append what happened — outcome, next step, blockers, and anything you ruled out. ' +
         'Negative results matter: they stop the next session repeating your work.'
       );
-      console.error(`session-hq: node hq.mjs inject --print --domain ${domain}   # to see the current file`);
+      console.error(`session-hq: ${cliCmd(`inject --print --domain ${domain}`)}   # to see the current file`);
     }
   }
 
@@ -828,7 +902,7 @@ const USAGE = `session-hq
   hq.mjs init          [--root <dir>] [--domains a,b,c] [--force]
   hq.mjs inject        [--event session-start|compact|manual] [--domain d] [--print]
   hq.mjs remind                                  PostToolUse counter / periodic nudge
-  hq.mjs update-check                            Stop: did this session update its status file?
+  hq.mjs update-check  [--domain d]              Stop hook; from a shell, reports on the domain
   hq.mjs wrap          --domain <d> [--quiet] [--expect-update] -- <command> [args...]
   hq.mjs inbox         "<one line>" [--domain d]
   hq.mjs decide        "<one line>" [--domain d]
@@ -844,7 +918,7 @@ export async function run(argv) {
     case 'init': return cmdInit(flags);
     case 'inject': return cmdInject(flags);
     case 'remind': return cmdRemind();
-    case 'update-check': return cmdUpdateCheck();
+    case 'update-check': return cmdUpdateCheck(flags);
     case 'wrap': return cmdWrap(rest);
     case 'inbox': return appendLine('inbox', flags, positional);
     case 'decide': return appendLine('decide', flags, positional);

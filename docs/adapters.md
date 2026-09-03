@@ -92,6 +92,13 @@ For a tool with a real hook system, pipe the hook's JSON payload to stdin and us
 echo '{"session_id":"<id>","cwd":"<dir>"}' | node scripts/hq.mjs update-check
 ```
 
+From a plain shell, without a session to key on, use the domain form instead — it reports rather
+than emitting hook JSON, and never reads stdin:
+
+```bash
+node scripts/hq.mjs update-check --domain <d>
+```
+
 Prints nothing if the session wrote back, if it did no work, or if it has already been reminded.
 Otherwise it emits a `systemMessage`, or a blocking `decision` when `update.enforce` is set. It
 needs the state file written at step 1, keyed by the same `session_id`.
@@ -105,6 +112,9 @@ needs the state file written at step 1, keyed by the same `session_id`.
 - **Never write status content.** Create the file, read it, ask for an update. A generated entry
   is a plausible-sounding entry, and one of those is all it takes for the file to stop being
   trusted.
+- **Speak the user's language.** Text printed by a hook may reference slash commands; text printed
+  by a wrapper or a shell must not, because those commands do not exist there. `inject` takes an
+  adapter voice for exactly this reason.
 - **Do not block the user's actual work.** `wrap` runs the command even when the HQ is missing,
   and warns on stderr instead.
 
