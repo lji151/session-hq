@@ -188,6 +188,44 @@ Language hint for generated templates and prose. It does not change the CLI's ow
 
 ---
 
+## Running an agent inside an HQ session (`wrap`)
+
+`wrap` is the adapter for agents that have no hook system. It prints the context the Claude Code
+SessionStart hook would inject, runs your command with the terminal attached, and checks on the
+way out whether anything was written back.
+
+```bash
+node scripts/hq.mjs wrap --domain <d> [options] -- <command> [args...]
+```
+
+Everything after `--` is the command, passed through untouched.
+
+| Option | Default | Effect |
+|---|---|---|
+| `--domain <d>` | `HQ_DOMAIN`, then `defaultDomain` | Which status file to inject and check. |
+| `--quiet` | off | Skip the injection. Useful once the agent reads the file itself. |
+| `--expect-update` | off | Always run the end-of-session check, however short the run. |
+| `--min-seconds <n>` | `60` | Below this, a run is assumed too short to owe an update. |
+
+Behaviour worth knowing:
+
+- **The child's exit code is propagated**, so `wrap` composes inside scripts and CI.
+- **The reminder goes to stderr**, never stdout, so it cannot contaminate a pipe.
+- **`update.mode: "manual"` disables the end-of-session check** here too.
+- **A missing `hq.config.json` does not block the command.** It warns on stderr and runs anyway —
+  losing your agent invocation over a config problem would be a bad trade.
+- **Windows `.cmd` and `.bat` shims work.** They are not real executables, so a direct spawn fails;
+  `wrap` retries through the shell for that specific failure only.
+- Each run leaves a `.state/wrap-<uuid>.json` behind, the same shape as a hook session.
+
+Typical use is an alias, so the HQ is not something you have to remember:
+
+```bash
+alias agent='node ~/session-hq/scripts/hq.mjs wrap --domain apps -- my-agent-cli'
+```
+
+There is no slash command for `wrap`: inside Claude Code the hooks already do this automatically.
+
 ## Session state
 
 Each session gets `<hqRoot>/.state/<session-id>.json`:

@@ -273,6 +273,94 @@ describe('remind / update-check cadence', () => {
   });
 });
 
+describe('wrap (the generic adapter)', () => {
+  test('prints the injection, runs the child, and propagates its exit code', () => {
+    const { stdout, code } = hq(['wrap', '--domain', 'apps', '--',
+      process.execPath, '-e', "console.log('CHILD-RAN'); process.exit(7)"]);
+    assert.equal(code, 7, 'the child exit code must survive');
+    assert.match(stdout, /Domain: \*\*apps\*\*/);
+    assert.match(stdout, /CHILD-RAN/);
+    assert.ok(stdout.indexOf('Domain: **apps**') < stdout.indexOf('CHILD-RAN'),
+      'context must be printed before the agent starts');
+  });
+
+  test('--quiet suppresses the injection but still runs the child', () => {
+    const { stdout, code } = hq(['wrap', '--domain', 'apps', '--quiet', '--',
+      process.execPath, '-e', "console.log('ONLY-CHILD')"]);
+    assert.equal(code, 0);
+    assert.match(stdout, /ONLY-CHILD/);
+    assert.ok(!/Domain: \*\*apps\*\*/.test(stdout));
+  });
+
+  test('reminds on stderr when the status file is unchanged', () => {
+    const { stderr, code } = hq(['wrap', '--domain', 'apps', '--quiet', '--expect-update', '--',
+      process.execPath, '-e', "console.log('did work')"]);
+    assert.equal(code, 0);
+    assert.match(stderr, /`status-apps\.md` is unchanged/);
+    assert.match(stderr, /Negative results matter/);
+  });
+
+  test('stays silent when the wrapped session updated the status file', () => {
+    // JSON.stringify gives a correctly escaped JS string literal for a Windows path.
+    const target = JSON.stringify(statusFile('video'));
+    const { stderr } = hq(['wrap', '--domain', 'video', '--quiet', '--expect-update', '--',
+      process.execPath, '-e', `require('fs').appendFileSync(${target}, ' - Status: written ')`]);
+    assert.equal(stderr.trim(), '');
+  });
+
+  test('stays silent for a short run when --expect-update is not passed', () => {
+    const { stderr } = hq(['wrap', '--domain', 'apps', '--quiet', '--',
+      process.execPath, '-e', "console.log('quick')"]);
+    assert.equal(stderr.trim(), '');
+  });
+
+  test('--min-seconds 0 makes any run worth a reminder', () => {
+    const { stderr } = hq(['wrap', '--domain', 'apps', '--quiet', '--min-seconds', '0', '--',
+      process.execPath, '-e', "console.log('quick')"]);
+    assert.match(stderr, /`status-apps\.md` is unchanged/);
+  });
+
+  test('refuses to run with nothing after --', () => {
+    const { code, stderr } = hq(['wrap', '--domain', 'apps']);
+    assert.equal(code, 1);
+    assert.match(stderr, /nothing to run/);
+  });
+
+  test('records session state for the wrapped run', () => {
+    hq(['wrap', '--domain', 'apps', '--quiet', '--', process.execPath, '-e', '0']);
+    const states = fs.readdirSync(path.join(ROOT, '.state'))
+      .filter((f) => f.startsWith('wrap-'))
+      .map((f) => JSON.parse(fs.readFileSync(path.join(ROOT, '.state', f), 'utf8')));
+    assert.ok(states.length > 0, 'a wrapped run must leave state behind');
+    assert.equal(states[0].domain, 'apps');
+    assert.equal(typeof states[0].statusHashAtStart, 'string');
+  });
+
+  test('runs a Windows .cmd shim through the shell fallback', { skip: process.platform !== 'win32' }, () => {
+    const shim = path.join(ROOT, 'probe.cmd');
+    fs.writeFileSync(shim, ['@echo off', 'echo SHIM-RAN', 'exit /b 3', ''].join(os.EOL));
+    const { stdout, code } = hq(['wrap', '--domain', 'apps', '--quiet', '--', shim]);
+    assert.equal(code, 3, '.cmd exit codes must survive the shell fallback');
+    assert.match(stdout, /SHIM-RAN/);
+  });
+
+  test('runs the command anyway when no HQ is configured', () => {
+    const empty = fs.mkdtempSync(path.join(os.tmpdir(), 'session-hq-nohq-'));
+    try {
+      const res = spawnSync(process.execPath, [CLI, 'wrap', '--quiet', '--',
+        process.execPath, '-e', "console.log('STILL-RAN')"], {
+        encoding: 'utf8', cwd: empty,
+        env: { ...process.env, HQ_ROOT: '', HQ_DOMAIN: '', USERPROFILE: empty, HOME: empty },
+      });
+      assert.equal(res.status, 0);
+      assert.match(res.stdout, /STILL-RAN/);
+      assert.match(res.stderr, /no hq\.config\.json found/);
+    } finally {
+      fs.rmSync(empty, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('inbox and decisions', () => {
   test('inbox appends one dated line tagged with the domain', () => {
     const { code, stdout } = hq(['inbox', 'a shared vocabulary file across the two clients'], { env: { HQ_DOMAIN: 'apps' } });
