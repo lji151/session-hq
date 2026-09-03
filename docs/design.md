@@ -23,6 +23,60 @@ The costs are specific and repeat:
 The last one matters most, and it is the one a purely technical solution will not fix. Nobody
 writes down failure unless something asks them to.
 
+## One session, or many
+
+Before the coordination problem, there is a choice that causes it.
+
+**One session for everything** is the obvious starting point, and it fails in two distinct ways.
+The first is mixing: unrelated work shares a context window, so the model answering a question
+about a thumbnail is still carrying the billing bug from this morning. Attention is finite for
+models in roughly the way it is for people, and a context full of irrelevance measurably degrades
+what comes out of it. The second is loss: a long session compacts, and compaction is lossy by
+construction. It drops what it judges least relevant, and it is sometimes wrong.
+
+The second failure has a well-known answer that predates any of this: keep a durable record
+outside the window. A notes vault, a git repository of memory files, a wiki. **session-hq does not
+replace a second brain, and is not trying to.** The two solve different problems, and the
+[layered-memory](../skills/layered-memory/SKILL.md) skill is about doing the second-brain half
+well.
+
+**Many sessions, one per project or domain,** fixes the mixing outright. Each session's context
+contains only what it is for. This is the right move and most people arrive at it on their own.
+
+It creates the third problem, which is the one this project exists for. At two or three sessions
+you can hold the picture in your head. At five or six you cannot, and the failure is quiet: nothing
+breaks, no error appears, every individual session is doing good work. You simply lose sight of the
+whole — which thread has stalled, which is waiting on a decision only you can make, which one you
+have not opened in a week and would not notice was missing. The information exists. It is just
+distributed across more windows than a person can hold.
+
+So the design target is not "make sessions talk to each other". It is **make the set of sessions
+legible from one place**, cheaply enough that keeping it current is not a second job.
+
+## The org chart
+
+The useful metaphor is a company, and it is worth stating once precisely because it predicts the
+design decisions rather than merely decorating them.
+
+Each session is a **department head**. They run their own department, know their area better than
+you do, and should not need permission to do their job. You do not want to attend every department
+meeting; that is the one-session model, and it is why it fails.
+
+The HQ folder is the **report the department heads file**, and the dashboard is that report read
+in one sitting — the view where a CEO sees what has stalled, what is blocked on them, and what
+nobody has picked up. This explains several things that would otherwise look arbitrary:
+
+- **Why sessions write their own entries** rather than having them generated. A report a department
+  did not write is not a report; it is a guess with a letterhead.
+- **Why "Ruled out" is mandatory.** The most valuable line in any status report is the one that
+  says *we tried this and it does not work* — and it is the line every department is tempted to
+  omit, because a dead end reads as a week with nothing to show.
+- **Why the files are per-domain and not per-project.** Departments, not tasks.
+- **Why staleness is surfaced rather than hidden.** A report nobody has updated in a month is not
+  reassuring; it is the single most important thing on the page.
+- **Why nothing here is a workflow engine.** The CEO does not run the departments. They read the
+  report and ask questions.
+
 ## The approach
 
 A folder of markdown files, one per domain, that every session reads at start and writes at end,

@@ -11,6 +11,30 @@ at session start, written at session end.
 
 ---
 
+## Why
+
+You could run everything in one session. Two things go wrong. Unrelated work mixes together and the
+context keeps growing, so quality degrades — the model is carrying yesterday's billing bug while you
+ask about a thumbnail. And compaction eventually drops something you needed. A second brain helps
+with the second problem: a notes vault, a git repo of memory files, anything durable outside the
+window. session-hq does not replace that, and you should still have one.
+
+So you split. One session per project, or per domain, however you like to cut it. The mixing stops
+and each session stays sharp.
+
+Then, somewhere around the fifth or sixth session, a different problem appears. Nothing is broken.
+Every session is doing fine work. You simply cannot see it any more — what is stalled, what is
+waiting on you, what nobody has touched in a week. It is all there, spread across too many windows
+to hold in your head.
+
+That third problem is the one this solves. Each session reports into one place, and one view shows
+all of it.
+
+The shape is an org chart. Each session is a department head who runs their own department and
+knows their own area far better than you do. The HQ is the report they file — the thing a CEO reads
+to see what has stalled, what is blocked, and what nobody has picked up. You do not want to sit in
+every department's meetings. You want the report. `hq.mjs dashboard` is that report.
+
 ## 60 seconds
 
 Shown with Claude Code, where the hooks make it automatic. Every other agent runs the same
