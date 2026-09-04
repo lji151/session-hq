@@ -58,7 +58,7 @@ exists without getting in the way of that.
   `dashboard` block or one of the two files is added.
 - 129 tests, up from 110. All 110 are unchanged.
 
-## [0.2.0] — 2026-02-06
+## [0.2.0] — 2026-09-03
 
 Most people are not power users. Three dashboard renderings and a wall of config is how the
 project went unused rather than used daily; this release gives them one thing to look at and an
@@ -104,7 +104,7 @@ unchanged — every 0.1.0 HQ folder keeps working exactly as it did.
   page-opening default; both were updated to pass `--terminal` rather than weakened or dropped.
 - 106 tests (up from 93), still no network calls and no committed fixtures.
 
-## [0.1.0] — 2026-01-31
+## [0.1.0] — 2026-09-03
 
 Initial release.
 
