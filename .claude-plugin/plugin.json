@@ -1,6 +1,6 @@
 {
   "name": "session-hq",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A shared, file-based headquarters for AI agent sessions (Claude Code plugin + agent-neutral CLI): per-domain status files read at session start and updated at session end, an ideas inbox, and a decisions log.",
   "author": {
     "name": "Jung Inn Lee",
