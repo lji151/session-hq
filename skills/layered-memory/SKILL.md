@@ -54,7 +54,9 @@ type: user | feedback | project | reference
 ---
 ```
 
-- **`name`** matches the filename, minus `.md`.
+- **`name`** matches the filename, minus `.md`. A `[[name]]` written anywhere in the directory
+  must resolve to a file in it, so a rename breaks every link to the old name — `/memory-lint`
+  reports each one, and the frontmatter `name` left behind by the rename.
 - **`description`** is load-bearing. It is a *routing* line, not a title. Compare:
   - Useless: `description: notes about the deploy process`
   - Useful: `description: deploys need an explicit approval step; the CLI has no dry-run, so a mistake is live immediately`
@@ -112,9 +114,11 @@ user stops checking. This came up after a summary claimed a suite passed when on
 
 ## Maintenance
 
-Run `/memory-lint` periodically. It catches the four failure modes that accumulate silently:
-missing or vague frontmatter, orphaned files, unreachable domain indexes, and files that have
-grown past one fact.
+Run `/memory-lint` periodically. It catches the failure modes that accumulate silently: missing
+or vague frontmatter, orphaned files, unreachable domain indexes, files that have grown past one
+fact, and links that no longer resolve. It also reports **value drift** — the same parameter
+written with different numbers in different files — as an advisory, because that is the one
+kind of rot where every file involved is perfectly well formed.
 
 When a fact turns out to be wrong, correct the file — do not add a second file contradicting the
 first. When a project ends, delete its files rather than leaving them to mislead. Memory that is

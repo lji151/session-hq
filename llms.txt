@@ -39,6 +39,11 @@ requiring config-file literacy up front.
   section order, `labels: "ko"`), and `--eject` for your own `dashboard.css` / template — three
   tiers of customising one page, in [docs/dashboard.md](docs/dashboard.md)
 - `inbox`, `decide`, `doctor`, `memory-lint`, `leak-check`
+- `memory-lint` also checks link integrity: `[[name]]` resolves to a file in the memory
+  directory, pointers in the indexes resolve, and frontmatter `name` matches the filename
+- `memory-lint --drift` is an **opt-in, off by default** advisory for **value drift** — the same
+  parameter written with different numbers in different files. Heuristic, `info` level, never a
+  failure, capped at ten keys; `--drift-min-files <n>` (default 2) raises the bar.
 - Slash-command equivalents live in [commands/](commands/), one file each.
 
 ## Guarantees, and how to check them
@@ -57,7 +62,7 @@ requiring config-file literacy up front.
   ([scripts/lib/wrap.mjs](scripts/lib/wrap.mjs)); `dashboard` opens the default browser on the page
   it writes, unless `--no-open` ([scripts/lib/dashboard.mjs](scripts/lib/dashboard.mjs)); `leak-check`
   also shells out to `git ls-files`.
-- **129 tests**, no network and no committed fixtures: `node --test`.
+- **147 tests**, no network and no committed fixtures: `node --test`.
 - [Security notes](docs/security.md): threat model, trust boundary, reporting.
 
 ## Non-goals, stated in the README
@@ -79,7 +84,7 @@ requiring config-file literacy up front.
 
 ## How to verify the repo
 
-- `node --test` — 129 tests
+- `node --test` — 147 tests (run it with no path)
 - `claude plugin validate . --strict` and `claude plugin validate .claude-plugin/plugin.json --strict`
 - `node scripts/leak-check.mjs --denylist .github/leak-denylist.example.txt` — credential-shaped
   pattern scan over tracked files

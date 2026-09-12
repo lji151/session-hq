@@ -17,7 +17,8 @@ worth preserving.
 ```bash
 git clone https://github.com/lji151/session-hq
 cd session-hq
-node --test                      # 40+ tests, no network, no fixtures on disk
+node --test                      # 140+ tests, no network, no fixtures on disk
+                                 # pass no path: some Node builds will not expand `test/`
 node scripts/hq.mjs doctor       # against your own HQ, if you have one
 ```
 
@@ -82,7 +83,7 @@ local denylist, at minimum grep your diff for your own username and home directo
 
 - **`scripts/hq.mjs` is a thin CLI**: argument parsing and a dispatch table. The work lives in
   `scripts/lib/` — one module per concern (`config`, `status`, `dispatch`, `dashboard`, `inject`,
-  `hooks`, `wrap`, `init`, `notes`, `doctor`, `memory`, `args`, `util`). Keep modules small and
+  `hooks`, `wrap`, `init`, `notes`, `doctor`, `memory`, `drift`, `args`, `util`). Keep modules small and
   the dependency direction one-way: `util` depends on nothing, and nothing depends on `hq.mjs`.
 - **Node built-ins only.** No dependencies, no native modules, no build step. If something seems
   to need a library, it probably needs less code instead.
@@ -93,6 +94,10 @@ local denylist, at minimum grep your diff for your own username and home directo
   workflow over a malformed config file is worse than not being installed.
 - **Adapters must stay silent when they have nothing to say.** No config, no domain, no work done —
   print nothing. Noise is what gets a tool removed.
+- **A heuristic is opt-in and advisory.** `memory-lint --drift` is the only guess in the
+  repository: it compares numbers across files and will sometimes pair two unrelated ones. So it
+  is off by default, its findings are `info` level, it never changes the exit code, and its list
+  is capped. Anything else that cannot be certain should follow the same shape.
 - **Comments explain why, not what.** If a line needs a comment saying what it does, rename
   something instead.
 

@@ -19,7 +19,7 @@
  *                             [--theme auto|paper|terminal|slate] [--density comfortable|compact]
  *                             [--labels en|ko] [--eject]
  *   node hq.mjs doctor        [--json]
- *   node hq.mjs memory-lint   [--dir <dir>] [--json]
+ *   node hq.mjs memory-lint   [--dir <dir>] [--json] [--drift [--drift-min-files <n>]]
  *   node hq.mjs leak-check    [--denylist <file>] [--dir <dir>]
  */
 
@@ -52,6 +52,7 @@ export { dispatchPath, parseDispatches, readDispatches, openDispatchesFor,
 export { readHookInput } from './lib/hooks.mjs';
 export { trimToLines } from './lib/inject.mjs';
 export { lintMemoryDir } from './lib/memory.mjs';
+export { driftFindings, collectValues } from './lib/drift.mjs';
 export { cmdDoctor } from './lib/doctor.mjs';
 export { parseArgs } from './lib/args.mjs';
 
@@ -82,6 +83,7 @@ const USAGE = `session-hq
                        [--eject]                           write the template and CSS to the HQ root
   hq.mjs doctor        [--json]
   hq.mjs memory-lint   [--dir <dir>] [--json]
+                       [--drift] [--drift-min-files <n>]      opt-in value-drift advisory
   hq.mjs leak-check    [--denylist <file>] [--dir <dir>]
 `;
 

@@ -25,7 +25,7 @@ at session start, written at session end.
 - **Runs external processes only when asked:** the command you put after `--` in `wrap`;
   `dashboard` opens your default browser unless you pass `--no-open`. (`leak-check` also calls
   `git ls-files`.)
-- **129 tests**, no network and no committed fixtures: `node --test`.
+- **147 tests**, no network and no committed fixtures: `node --test`.
 - **CI:** ubuntu, macos and windows on Node 18 and 22 — `.github/workflows/test.yml`.
 - **Verified by hand on Windows 11** (Claude Code 2.1.x, live install and hook run) **and on Linux**
   (WSL Ubuntu, Node 22: full suite, `init`, `wrap` exit-code propagation, `dashboard`). macOS is
@@ -435,6 +435,25 @@ fact per file. The session reads the index matching its work and nothing else, s
 remembering scales with relevance instead of volume. Includes the frontmatter schema, the
 triage-first rule, and the Why / How-to-apply format that keeps a correction from being argued
 away six weeks later. Audit a directory with `node scripts/hq.mjs memory-lint` (or `/memory-lint`).
+
+The lint reads a memory directory and writes nothing. It reports missing or vague frontmatter,
+orphaned files, unreachable domain indexes, files that have grown past one fact, and one more
+check added in 0.4.0 — plus an opt-in advisory:
+
+- **Link integrity** — a `[[name]]` that resolves to no file in the directory, which is what a
+  rename leaves behind in every file that pointed at the old name. Where exactly one file matches
+  the old name with a type prefix, the finding names it: *did you mean
+  `[[feedback-episode-length]]`?* A frontmatter `name` that disagrees with its filename is
+  reported the same way, because links to it cannot resolve either. Warning level.
+- **Value drift** (`--drift`, **off by default**) — the same parameter written with different
+  numbers in different files: `value drift: "gate °C" = 55 (a.md), 72 (b.md)`. This is the failure
+  the other checks cannot see, because every file involved is well formed; it was found by hand
+  after a hardware temperature gate ended up in eight files with seven different values. It is a
+  **heuristic advisory** and it is opt-in for a reason: on a large directory a fair share of what
+  it pairs will be two unrelated numbers that happen to share a word and a unit. Findings are
+  `info` level, they never fail the lint, and the list stops at ten keys with a line saying how
+  many were held back. `--drift-min-files <n>` (default 2) only reports a parameter that disagrees
+  across at least *n* files, which is the quickest way to shorten a noisy list.
 
 **[orchestrator-routing](skills/orchestrator-routing/SKILL.md)** — a coordinator that writes
 briefs and reviews output, with coding and research delegated to other tiers. Includes the brief
