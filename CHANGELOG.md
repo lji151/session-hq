@@ -4,6 +4,54 @@ All notable changes to this project are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] — 2026-09-12
+
+Two kinds of memory rot that every existing check waves through, because each file involved is
+perfectly well formed on its own. Both were found by hand in a 108-file memory directory that
+`memory-lint` had just reported clean.
+
+### Added
+
+- **`memory-lint` checks link integrity.** A `[[name]]` that resolves to no file in the memory
+  directory is a warning — this is what a rename leaves behind, and the file that pointed at the
+  old name keeps looking correct. When exactly one file matches the old name with a type prefix,
+  the finding says so: `broken link [[episode-length]] — no such file (did you mean
+  [[feedback-episode-length]]?)`. A frontmatter `name` that disagrees with the filename is the
+  same failure one step earlier, and is reported with it. Wikilinks inside fenced blocks and code
+  spans are ignored, as are bracket pairs that are plainly not links (`[[0.3,7.4]]`).
+- **Pointer links in the indexes are resolved too.** `[Tooling](reference-tooling.md)` in
+  `MEMORY.md` or an `index-*.md` that names a file which does not exist is now a warning rather
+  than silence.
+- **`memory-lint --drift` reports value drift** — the same parameter written with different
+  numbers in different files, which is what happens when a value is copied into six files and
+  later changed in one. The check pairs a number carrying a unit with the nearest word before it
+  and compares across files: `value drift: "gate °C" = 55 (a.md), 72 (b.md) — one of these is
+  probably stale`. Dates, times, years, version strings, numbers inside code, arrow chains
+  recording a value's history, and any word that carries several different numbers inside a
+  single file are all skipped. The one-line rationale: a hardware temperature gate was once
+  written in eight files with seven different values, and every one of those files passed the
+  lint.
+
+  It is **off by default and advisory when on**, because on a large directory a fair share of what
+  it pairs is two unrelated numbers that happen to share a word and a unit. Findings are `info`
+  level and never fail the lint; the list stops at ten keys and ends with `N more — raise
+  --drift-min-files or fix these first`. `--drift-min-files <n>` (default 2) only reports a
+  parameter that disagrees across at least *n* files.
+
+### Fixed
+
+- **A nested pair of parentheses no longer hides a link from the lint.** `[a](b.md) — see also
+  ([c](d.md))` used to parse as one link to a nonexistent target, so `d.md` was reported as an
+  orphan. The link pattern now refuses parentheses and spaces inside a target.
+
+### Notes
+
+- No file format, hook or protocol change, and no new dependency. The new work lives in
+  `scripts/lib/drift.mjs`, which imports nothing.
+- Drift is off the critical path by design: it is opt-in, and an advisory that fails a build
+  stops being read.
+- 147 tests, up from 129. All 129 are unchanged.
+
 ## [0.3.0] — 2026-09-04
 
 Most users are not power users, so every choice here is one word — and the full-control path
@@ -186,6 +234,8 @@ Initial release.
 - Hooks load at session start, so Claude Code must be restarted after installing.
 - Every adapter stays silent on a machine with no HQ configured; `wrap` runs the command anyway.
 
-[Unreleased]: https://github.com/lji151/session-hq/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/lji151/session-hq/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/lji151/session-hq/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/lji151/session-hq/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/lji151/session-hq/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/lji151/session-hq/releases/tag/v0.1.0

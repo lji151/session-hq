@@ -3,7 +3,7 @@
 A shared, file-based headquarters for AI coding-agent sessions. One markdown status file per
 domain, read at session start and written at session end, plus an ideas inbox, a decision log,
 and a dispatch queue. The protocol is plain markdown; `scripts/hq.mjs` is a dependency-free Node
-CLI; the Claude Code plugin is one adapter over it. Version 0.2.0, MIT.
+CLI; the Claude Code plugin is one adapter over it. Version 0.4.0, MIT.
 
 Two things make it approachable rather than a wall of config: `dashboard` with no flags writes one
 page and opens it (the terminal and markdown views are still there, behind `--terminal`/`--md`),
